@@ -1,0 +1,10 @@
+{
+  "walletusername": "CHANGEME",
+  "walletpassword": "CHANGEME",
+  "walletport": 54660,
+  "mongodbusername": "CHANGEME",
+  "mongodbpassword": "CHANGEME",
+  "mongodbport": "27017",
+  "mongodbnamemainnet": "ion-mainet",
+  "mongodbnametestnet": "ion-testnet"
+}
