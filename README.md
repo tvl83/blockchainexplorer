@@ -47,3 +47,7 @@ After everything is set up be sure to change all the information in `config.json
  the second step is `node import --cmd=pavv --end=500` would run from 1 to 500 if you run less than there are blocks/txs you can run pavv (pavv = **P**rocess**A**ddress**V**outs**V**ins) with a `--start=2` argument. With anything greater than 1 for the start argument it looks at the very last vin in the db and adds 1 and starts from there.
 
  What I am finding out is that if I have 500 blocks/txs and then do pavv `--end=100` then `--start=2 --end=200` it is doubling the data on the first 100 transactions instead of skipping them for some reason.
+
+### Other Notes
+
+With the API server running (`nodemon apiserver.js` and `npm start` also running you need to run http://<your IP here>:3001/ionmarketinfo?force=true to gather the market info for the first time. It'll run again for every page request if the data is more than 5 minutes old.
