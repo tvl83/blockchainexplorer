@@ -51,3 +51,22 @@ After everything is set up be sure to change all the information in `config.json
 ### Other Notes
 
 With the API server running (`nodemon apiserver.js`) and `npm start` also running you need to run `http://<your IP here>:3001/ionmarketinfo?force=true` to gather the market info for the first time. It'll run again for every page request if the data is more than 5 minutes old.
+
+## TODO
+
+9/28/2017 source: https://github.com/ionomy/ion/wiki/ionomy-Bounty-Information
+**Delivered options must include:** All historical block extraction information ( ~~Latest Blocks~~ , ~~block times~~, daily block count), ~~richlist~~, ~~active network/client/nodes~~, address tagging, inflation information.
+
+- Daily block count is another part I still have to build and is pretty straight forward.
+- Inflation information. I am not entirely sure how to calculate this information. I am pretty sure it's the rate at which coins are created.
+- Address Tagging. This is already set up in the mongoose schema's and the functionality is built into the wallet. Creating the functions for this will be easy and quick. I cannot test it until the blockchain is up to date, though because I need to have an address that I own to be able to sign a message.
+
+### Complete
+
+- **Latest Blocks** are on the index page and one can visit the block by height and by hash
+  - Transactions are also listed and linked to by hash
+  - Addresses can be visited and viewed with `/address/<address>`
+- **Block times** are included in the latest blocks list
+- Balances are updated for a given address on the fly when new blocks affect a specific address. A `calculatebalances` function is ran every night to update **richlist** rankings
+- **active network/client/nodes** list is available. It is similar to chainz and has information on the latest nodes that have connected to my node within the last 24 hours. Every 5 minutes it checks `getpeerinfo` and updates information in the database. After 24 hours if a given IP address is not updated it will be removed.
+
