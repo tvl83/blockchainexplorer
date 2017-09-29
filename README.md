@@ -50,4 +50,4 @@ After everything is set up be sure to change all the information in `config.json
 
 ### Other Notes
 
-With the API server running (`nodemon apiserver.js` and `npm start` also running you need to run http://<your IP here>:3001/ionmarketinfo?force=true to gather the market info for the first time. It'll run again for every page request if the data is more than 5 minutes old.
+With the API server running (`nodemon apiserver.js`) and `npm start` also running you need to run `http://<your IP here>:3001/ionmarketinfo?force=true` to gather the market info for the first time. It'll run again for every page request if the data is more than 5 minutes old.
