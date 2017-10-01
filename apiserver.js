@@ -20,7 +20,7 @@ app.use(cookieParser());
 let mongoose = require('mongoose');
 
 let mongooseConnectString = `mongodb://${config.mongodbusername}:${config.mongodbpassword}@localhost:${config.mongodbport}/${config.mongodbnamemainnet}?authSource=admin`;
-console.log(mongooseConnectString);
+// console.log(mongooseConnectString);
 
 mongoose.connect(mongooseConnectString, {useMongoClient: true});
 

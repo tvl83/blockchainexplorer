@@ -1,10 +1,19 @@
 {
-  "walletusername": "CHANGEME",
-  "walletpassword": "CHANGEME",
+
+  "walletusername": "97vNWGX0V4F9uIJdN2Pg0tsJ4ghhc6uP",
+
+  "walletpassword": "70XaTbTUKLLiTumR7uXClXpSbffrCSKl",
+
   "walletport": 54660,
-  "mongodbusername": "CHANGEME",
-  "mongodbpassword": "CHANGEME",
+
+  "mongodbusername": "ionadmin",
+
+  "mongodbpassword": "PD545D89MufBcEak6WvY9HRYa",
+
   "mongodbport": "27017",
-  "mongodbnamemainnet": "ion-mainet",
+
+  "mongodbnamemainnet": "ion-mainnet",
+
   "mongodbnametestnet": "ion-testnet"
+
 }

@@ -1,4 +1,20 @@
 let mongoose = require('mongoose');
+const arrayUniquePlugin = require('mongoose-unique-array');
+
+const voutsArraySchema = mongoose.Schema({
+	txid: String,
+	n: Number,
+	value: Number,
+	time: Number,
+	address: String
+});
+
+const vinsArraySchema = mongoose.Schema({
+	txid: String,
+	voutIndex: Number,
+	value: Number,
+	address: String
+});
 
 const transactionSchema = mongoose.Schema({
 	raw: {
@@ -15,34 +31,24 @@ const transactionSchema = mongoose.Schema({
 	txid: {type: String, unique: true, index: true},
 	totalValueIn: Number,
 	totalValueOut: Number,
-	rawVins: [],
-	rawVouts: [],
+	// rawVins: [],
+	// rawVouts: [],
 	blockheight: Number,
 	blockhash: String,
-	vins: [
-		{
-			txid: String,
-			voutIndex: Number,
-			value: Number,
-			address: String
-		}
-	],
-	vouts: [
-		{
-			txid: String,
-			n: Number,
-			value: Number,
-			time: Number,
-			address: String
-		}
-	]
+	vins: [{type: vinsArraySchema, unique: true}],
+	vouts: [{type: voutsArraySchema, unique: true}]
 });
+
 
 transactionSchema.statics.latestBlock = function (cb) {
 	this.findOne()
 		.sort('-blockheight')
 		.exec(cb);
 };
+
+transactionSchema.index({"txid": 1, "vouts": [{"n": 1, "value": 1}]}, {unique: true});
+
+transactionSchema.plugin(arrayUniquePlugin);
 
 let Transactions = mongoose.model('Transactions', transactionSchema);
 

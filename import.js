@@ -172,7 +172,6 @@ switch (cmd.toLowerCase()) {
 	case "pavv": // ProcessAddressVinsVouts
 		start = argsArray.start || 1;
 		end = argsArray.end;
-		console.log(`pavv(${start}, ${end})`);
 		pavvSetup(start, end);
 		break;
 	default:
@@ -184,10 +183,12 @@ function pavvSetup(startBlock, endBlock) {
 	if (startBlock > 1) {
 		Vins.latestBlock(function (err, block) {
 			startBlock = block.blockheight + 1;
-			pavv(startBlock, endBlock)
+			pavv(startBlock, endBlock);
+			console.log(`pavv(${start}, ${end})`);
 		})
 	} else {
-		pavv(startBlock, endBlock)
+		pavv(startBlock, endBlock);
+		console.log(`pavv(${start}, ${end})`);
 	}
 }
 
@@ -199,101 +200,105 @@ function pavv(startBlock, endBlock) {
 	let voutsForVins = [];
 	let vinsForAddress = [];
 	let voutsForAddress = [];
+	let newAddressesArray = [];
 
 	timeStarted = new Date();
 
+	console.log(`{$and: [{blockheight: {$gte: ${startBlock}}}, {blockheight: {$lte: ${endBlock}}}]}`);
 
 	Transactions.find({$and: [{blockheight: {$gte: startBlock}}, {blockheight: {$lte: endBlock}}]})
 		.then(txs => {
+			console.log("inside transactions.find()");
 			txs.forEach(tx => {
-				if (!tx.hasOwnProperty("dupe")) {
-					tx.raw.vout.forEach(vout => {
+				console.log("inside txs.forEach");
+				tx.raw.vout.forEach(vout => {
+					console.log("inside tx.raw.vout.forEach");
+					if (vout.scriptPubKey !== undefined && vout.scriptPubKey.addresses !== undefined) {
 						let address = vout.scriptPubKey.addresses[0];
+						console.log(address);
 
 						totalSaveAddresses++;
 						saveAddressArray.push(saveAddress(address));
+						newAddressesArray.push(address);
 
 						totalSaveVouts++;
-						saveVoutsArray.push(saveVout(vout, tx.raw, tx.blockheight));
-					});
-					tx.raw.vin.forEach(vin => {
-						totalSaveVins++;
-						saveVinsArray.push(saveVins(vin, tx.raw, tx.blockheight));
-					});
-				}
+						saveVoutsArray.push(saveVout(vout, tx.raw, tx.blockheight, address));
+					} else {
+						console.log(`vout has no 'scriptPubKey'`);
+					}
+				});
+				tx.raw.vin.forEach(vin => {
+					console.log("inside tx.raw.vin.forEach");
+					totalSaveVins++;
+					saveVinsArray.push(saveVins(vin, tx.raw, tx.blockheight));
+				});
 			});
 			console.log("waiting on saveAddressArray to finish");
 			Promise.all(saveAddressArray)
-				.then(addresses => {
+				.then(() => {
 					console.log("all saveAddressArray resolved successfully");
 				})
 				.catch(err => {
-					console.log("Caught from promise.all(saveVinsArray)");
-					if (err.code !== 11000)
-						console.log(err);
+					console.log(err);
 				});
 
 			console.log("waiting on saveVoutsArray to finish");
 			Promise.all(saveVoutsArray)
-				.then(vouts => {
+				.then(() => {
 					console.log("all saveVoutsArray resolved successfully");
 				})
 				.catch(err => {
-					console.log("Caught from promise.all(saveVinsArray)");
 					console.log(err);
 				});
 
 			console.log("waiting on saveVinsArray to finish");
 			Promise.all(saveVinsArray)
 				.then(vins => {
-					Vins.find({"raw.txid": {$exists: true}})
-						.then(foundVins => {
-							// console.log("vins.length: ", vins.length);
-							foundVins.forEach((vin) => {
-								console.log(`processVins(${vin._id})`);
-								totalProcessVins++;
-								vinsToProcess.push(processVins(vin._id));
+					console.log('inside promise.all(saveVinsArray)');
+					vins.forEach(vin => {
+						if (vin.raw.txid !== undefined) {
+							console.log("vins.length: ", vins.length);
+							console.log(`processVins(${vin._id})`);
+							totalProcessVins++;
+							vinsToProcess.push(processVins(vin._id));
+						}
+					});
+
+					Promise.all(vinsToProcess)
+						.then(vins => {
+							console.log(`vinsToProcess all resolved ${vins.length} vins`);
+							vins.forEach(vin => {
+								if (vin !== null) {
+									totalVoutsForVins++;
+									voutsForVins.push(linkVinsToVouts(vin));
+								}
 							});
 
-							Promise.all(vinsToProcess)
-								.then(vins => {
-									console.log(`vinsToProcess all resolved ${vins.length} vins`);
-									vins.forEach(vin => {
-										if (vin !== null) {
-											totalVoutsForVins++;
-											voutsForVins.push(linkVinsToVouts(vin));
-										}
+							Promise.all(voutsForVins)
+								.then(() => {
+									console.log("inside promise.all for voutsForVins");
+									newAddressesArray.forEach(address => {
+										// console.log(`voutsForAddress.push(linkVoutsToAddress(${address.address}))`);
+										console.log(`address: ${address}`);
+										voutsForAddress.push(linkVoutsToAddress(address));
 									});
-
-									Promise.all(voutsForVins)
+									console.log("finished pushing promises to array");
+									Promise.all(voutsForAddress)
 										.then(() => {
-											console.log("inside promise.all for voutsForVins");
-											Addresses.find({})
-												.then(findAddresses => {
-													findAddresses.forEach(address => {
-														console.log(`voutsForAddress.push(linkVoutsToAddress(${address.address}))`);
-														voutsForAddress.push(linkVoutsToAddress(address.address));
-													});
-													console.log("finished pushing promises to array");
-													Promise.all(voutsForAddress)
-														.then(() => {
-															findAddresses.forEach(address => {
-																console.log(`vinsForAddress.push(linkVinsToAddress(${address.address}))`);
-																vinsForAddress.push(linkVinsToAddress(address.address));
-															});
-															Promise.all(vinsForAddress)
-																.then(() => {
-																	summary();
-																})
-														})
-												});
+											newAddressesArray.forEach(address => {
+												// console.log(`vinsForAddress.push(linkVinsToAddress(${address.address}))`);
+												vinsForAddress.push(linkVinsToAddress(address));
+											});
+											Promise.all(vinsForAddress)
+												.then(() => {
+													summary();
+												})
 										})
 								})
 						})
 				})
 		})
 }
-
 
 function catchUpTxs(startBlock, endBlock) {
 	let saveAddressArray = [];
@@ -337,7 +342,7 @@ function catchUpTxs(startBlock, endBlock) {
 										saveAddressArray.push(saveAddress(address));
 
 										totalSaveVouts++;
-										saveVoutsArray.push(saveVout(vout, tx.raw, tx.blockheight));
+										saveVoutsArray.push(saveVout(vout, tx.raw, tx.blockheight, address));
 									});
 									tx.raw.vin.forEach(vin => {
 										totalSaveVins++;
@@ -499,8 +504,9 @@ function saveBlocksSetup(end) {
 				start = 1;
 			} else {
 				start = block.height;
+				console.log(`starting at ${block.height}`);
 			}
-			saveBlocks(start, end)
+			saveBlocks(start + 1, end)
 		} else {
 			throw err;
 		}
@@ -568,7 +574,6 @@ function saveBlocks(start, end) {
 		});
 
 }
-
 
 function saveHashes(start, count) {
 	let cnt = 0;
@@ -686,7 +691,7 @@ function calculateAddressBalances() {
 }
 
 /* This will calculate the totalSent, totalReceived, runningBalance and total balance
- for each given address. the ledger parameter must be a concatendated, in order array
+ for each given address. the ledger parameter must be a concatenated, in order array
  of ledgerOut and ledgerIns
 */
 function calculateBalances(address, ledger) {
@@ -765,162 +770,120 @@ function processBlocks(start, count) {
 
 	Promise.all(getBlockArray)
 		.then(blocks => {
-				console.log("Resolving getBlockArray");
-				blocks.forEach(block => {
-					// console.log("block", block);
-					let obj = {
-						hash: block.hash,
-						height: block.height,
-						raw: block
-					};
-					totalSaveBlocks++;
-					createBlockArray.push(createBlock(obj));
-				});
-				Promise.all(createBlockArray)
-					.then((blocks) => {
-							console.log("Resolving createBlockArray");
-							blocks.forEach(block => {
-								if (!block.err) {
-									block.raw.tx.forEach(tx => {
-										totalGetTx++;
-										getTxArray.push(getTx(tx, block));
-									})
-								}
-							});
-							Promise.all(getTxArray)
-								.then(txs => {
-										console.log("Resolving getTxArray");
-										txs.forEach(tx => {
-											totalSaveTx++;
-											createTxArray.push(createTx(tx.tx, tx.block));
-										});
-										Promise.all(createTxArray)
-											.then(txs => {
-												console.log("resolving createTxArray");
-												txs.forEach(tx => {
-													if (tx.dupe === undefined) {
-														tx.raw.vout.forEach(vout => {
-															console.log(vout);
-															let address = vout.scriptPubKey.addresses[0];
-
-															totalSaveAddresses++;
-															saveAddressArray.push(saveAddress(address));
-
-															totalSaveVouts++;
-															saveVoutsArray.push(saveVout(vout, tx.raw, tx.blockheight));
-														});
-														tx.raw.vin.forEach(vin => {
-															totalSaveVins++;
-															saveVinsArray.push(saveVins(vin, tx.raw, tx.blockheight));
-														});
-													}
-												});
-
-												Promise.all(saveAddressArray)
-													.then(addresses => {
-														console.log("all saveAddressArray resolved successfully");
-													})
-													.catch(err => {
-														console.log("Caught from promise.all(saveVinsArray)");
-														if (err.code !== 11000)
-															console.log(err);
-													});
-
-												Promise.all(saveVoutsArray)
-													.then(vouts => {
-														console.log("all saveVoutsArray resolved successfully");
-													})
-													.catch(err => {
-														console.log("Caught from promise.all(saveVinsArray)");
-														console.log(err);
-													});
-
-												Promise.all(saveVinsArray)
-													.then(vins => {
-														Vins.find({"raw.txid": {$exists: true}})
-															.then(foundVins => {
-																// console.log("vins.length: ", vins.length);
-																foundVins.forEach((vin) => {
-																	totalProcessVins++;
-																	console.log(`processVins(${vin._id})`);
-																	vinsToProcess.push(processVins(vin._id));
-																});
-
-																Promise.all(vinsToProcess)
-																	.then(vins => {
-																		console.log(`vinsToProcess all resolved ${vins.length} vins`);
-																		vins.forEach(vin => {
-																			totalVoutsForVins++;
-																			voutsForVins.push(linkVinsToVouts(vin));
-																		});
-
-																		Promise.all(voutsForVins)
-																			.then(newVins => {
-																				console.log("inside promise.all for voutsForVins");
-																				Addresses.find({})
-																					.then(findAddresses => {
-																						findAddresses.forEach(address => {
-																							voutsForAddress.push(linkVoutsToAddress(address.address));
-																						});
-																						console.log("finished pushing promises to array");
-																						Promise.all(voutsForAddress)
-																							.then(addresses => {
-																								findAddresses.forEach(address => {
-																									// console.log(`vinsForAddress.push(linkVinsToAddress(${address.address}))`);
-																									vinsForAddress.push(linkVinsToAddress(address.address));
-																								});
-																								Promise.all(vinsForAddress)
-																									.then(addresses => {
-																										summary();
-																									})
-																									.catch(err => {
-																										throw err;
-																									});
-																							}).catch(err => {
-																							throw err;
-																						});
-																					});
-																			})
-																	})
-																	.catch(err => {
-																		console.log(err);
-																	})
-															})
-															.catch(err => {
-																console.log(err);
-															})
-													})
-													.catch(err => {
-														console.log("Caught from promise.all(saveVinsArray)");
-														console.log(err);
-													})
-											})
-											.catch(err => {
-												console.log("Caught from promise.all(createTxArray)");
-												console.log(err);
-											})
-									}
-								)
-								.catch(err => {
-									console.log("Caught from promise.all(getTxArray)");
-									console.log(err);
-								})
+			console.log("Resolving getBlockArray");
+			blocks.forEach(block => {
+				// console.log("block", block);
+				let obj = {
+					hash: block.hash,
+					height: block.height,
+					raw: block
+				};
+				totalSaveBlocks++;
+				createBlockArray.push(createBlock(obj));
+			});
+			Promise.all(createBlockArray)
+				.then((blocks) => {
+					console.log("Resolving createBlockArray");
+					blocks.forEach(block => {
+						if (!block.err) {
+							block.raw.tx.forEach(tx => {
+								totalGetTx++;
+								getTxArray.push(getTx(tx, block));
+							})
 						}
-					)
-					.catch(err => {
-						console.log("Caught from promise.all(createBlockArray)");
-						console.log(err);
-					})
-			}
-		)
-		.catch(err => {
-			console.log("Caught from promise.all(getBlockArray)");
-			console.log(err);
+					});
+					Promise.all(getTxArray)
+						.then(txs => {
+							console.log("Resolving getTxArray");
+							txs.forEach(tx => {
+								totalSaveTx++;
+								createTxArray.push(createTx(tx.tx, tx.block));
+							});
+							Promise.all(createTxArray)
+								.then(txs => {
+									console.log("resolving createTxArray");
+									txs.forEach(tx => {
+										if (tx.dupe === undefined) {
+											tx.raw.vout.forEach(vout => {
+												console.log(vout);
+												let address = vout.scriptPubKey.addresses[0];
+
+												totalSaveAddresses++;
+												saveAddressArray.push(saveAddress(address));
+
+												totalSaveVouts++;
+												saveVoutsArray.push(saveVout(vout, tx.raw, tx.blockheight, address));
+											});
+											tx.raw.vin.forEach(vin => {
+												totalSaveVins++;
+												saveVinsArray.push(saveVins(vin, tx.raw, tx.blockheight));
+											});
+										}
+									});
+
+									Promise.all(saveAddressArray)
+										.then(() => {
+											console.log("all saveAddressArray resolved successfully");
+										});
+
+									Promise.all(saveVoutsArray)
+										.then(() => {
+											console.log("all saveVoutsArray resolved successfully");
+										});
+
+									Promise.all(saveVinsArray)
+										.then(() => {
+											Vins.find({"raw.txid": {$exists: true}})
+												.then(foundVins => {
+													// console.log("vins.length: ", vins.length);
+													foundVins.forEach((vin) => {
+														totalProcessVins++;
+														console.log(`processVins(${vin._id})`);
+														vinsToProcess.push(processVins(vin._id));
+													});
+
+													Promise.all(vinsToProcess)
+														.then(vins => {
+															console.log(`vinsToProcess all resolved ${vins.length} vins`);
+															vins.forEach(vin => {
+																totalVoutsForVins++;
+																voutsForVins.push(linkVinsToVouts(vin));
+															});
+
+															Promise.all(voutsForVins)
+																.then(newVins => {
+																	console.log("inside promise.all for voutsForVins");
+																	Addresses.find({})
+																		.then(findAddresses => {
+																			findAddresses.forEach(address => {
+																				voutsForAddress.push(linkVoutsToAddress(address.address));
+																			});
+																			console.log("finished pushing promises to array");
+																			Promise.all(voutsForAddress)
+																				.then(addresses => {
+																					findAddresses.forEach(address => {
+																						// console.log(`vinsForAddress.push(linkVinsToAddress(${address.address}))`);
+																						vinsForAddress.push(linkVinsToAddress(address.address));
+																					});
+																					Promise.all(vinsForAddress)
+																						.then(addresses => {
+																							summary();
+																						})
+																				})
+																		});
+																})
+														})
+												})
+										})
+								})
+						})
+				})
 		})
 }
 
 function linkVinsToAddress(address) {
 	return new Promise((resolve, reject) => {
+		console.log(`linkVinsToAddress(${address})`);
 		Vins.find({address: address})
 			.then(vins => {
 				if (vins.length > 0) {
@@ -1044,7 +1007,7 @@ function linkVoutsToAddress(address) {
 										}
 									},
 									{new: true},
-									function (err, newDoc) {
+									function (err) {
 										if (err) {
 											console.log("rejecting with err: ", err);
 											reject(err);
@@ -1056,33 +1019,46 @@ function linkVoutsToAddress(address) {
 								let txVoutObj = voutObj;
 								txVoutObj['address'] = vout.address;
 
-								Transactions.findOneAndUpdate({txid: vout.txid},
-									{
-										$push: {
-											vouts: txVoutObj
+								let UPDATE_TX = true;
+
+								Transactions.findOne({txid: vout.txid})
+									.then(transaction => {
+										// console.log(`transaction.vouts.forEach() ${vout.txid}`);
+										transaction.vouts.forEach(txVout => {
+											// console.log(`${txVout.txid} @ ${txVout.n}`);
+											if (txVout.n === txVoutObj.n && txVout.txid === txVoutObj.txid && txVout.address === txVoutObj.address) {
+												console.log(`----------------- FOUND MATCH DON'T ADD VOUT TO TX -----------------`);
+												console.log(`----------------- ${txVout.txid} ${txVout.n} -----------------`);
+												resolve({dupe: true});
+												UPDATE_TX = false;
+											}
+										});
+										console.log(`update_tx: ${UPDATE_TX}`);
+										if (UPDATE_TX) {
+											Transactions.findOneAndUpdate(
+												{txid: vout.txid},
+												{
+													$push: {
+														vouts: txVoutObj
+													}
+												}, {new: true},
+												function (err, newDoc) {
+													if (err) {
+														console.log("----------------- rejecting with err: -----------------", err);
+														reject(err);
+													}
+													else {
+														console.log(`finished Transactions.findOneAndUpdate({txid: ${vout.txid} ${vout.n}) `);
+														// console.log(`newDoc: ${newDoc}}) `);
+														resolve(newDoc);
+													}
+												})
 										}
-									}, {new: true},
-									function (err, newDoc) {
-										if (err) {
-											console.log("rejecting with err: ", err);
-											reject(err);
-										}
-										else {
-											// console.log(`finished Transactions.findOneAndUpdate({txid: ${vout.txid}}) `);
-											// console.log(`newDoc: ${newDoc}}) `);
-											resolve(newDoc);
-										}
-									})
+									});
 							})
-							.catch(err => {
-								console.log("catching err");
-								console.log(err);
-								console.log("resolve null");
-								resolve({address: null, err: err})
-							});
 					})
 				} else {
-					console.log("resolve null");
+					console.log(`inside linkVoutsToAddress resolve null because vout==null ${address}`);
 					resolve({address: null})
 				}
 			})
@@ -1183,7 +1159,7 @@ function summary(data) {
 
 function saveVins(vin, tx, blockheight) {
 	return new Promise((resolve, reject) => {
-		console.log(`${vin}, ${tx}, ${blockheight}`);
+		console.log("saveVINS()");
 		Vins.create(
 			{
 				raw: vin,
@@ -1220,13 +1196,14 @@ function saveVins(vin, tx, blockheight) {
 	})
 }
 
-function saveVout(vout, tx, blockheight) {
+function saveVout(vout, tx, blockheight, address) {
 	return new Promise((resolve, reject) => {
+		console.log("saveVOUT()");
 		let voutObj = {
 			raw: vout,
 			n: vout.n,
 			value: vout.value,
-			address: vout.scriptPubKey.addresses[0],
+			address: address,
 			txid: tx.txid,
 			blockheight: blockheight,
 			time: tx.time
@@ -1248,6 +1225,7 @@ function saveVout(vout, tx, blockheight) {
 
 function saveAddress(address) {
 	return new Promise((resolve, reject) => {
+		console.log("saveADDRESS()");
 		Addresses.create({address}, function (err, address) {
 			if (err && err.code === 11000) {
 				console.log("error 11000 ... dupe address... moving on...");
