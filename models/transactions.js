@@ -31,14 +31,15 @@ const transactionSchema = mongoose.Schema({
 	txid: {type: String, unique: true, index: true},
 	totalValueIn: Number,
 	totalValueOut: Number,
-	// rawVins: [],
-	// rawVouts: [],
+	rawVins: [],
+	rawVouts: [],
 	blockheight: Number,
 	blockhash: String,
 	vins: [{type: vinsArraySchema, unique: true}],
 	vouts: [{type: voutsArraySchema, unique: true}]
 });
 
+transactionSchema.plugin(arrayUniquePlugin);
 
 transactionSchema.statics.latestBlock = function (cb) {
 	this.findOne()
@@ -48,7 +49,6 @@ transactionSchema.statics.latestBlock = function (cb) {
 
 transactionSchema.index({"txid": 1, "vouts": [{"n": 1, "value": 1}]}, {unique: true});
 
-transactionSchema.plugin(arrayUniquePlugin);
 
 let Transactions = mongoose.model('Transactions', transactionSchema);
 
