@@ -33,7 +33,7 @@ const transactionSchema = mongoose.Schema({
 	totalValueOut: Number,
 	rawVins: [],
 	rawVouts: [],
-	blockheight: Number,
+	blockheight: {type: Number, index: true},
 	blockhash: String,
 	vins: [{type: vinsArraySchema, unique: true}],
 	vouts: [{type: voutsArraySchema, unique: true}]

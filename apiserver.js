@@ -118,6 +118,17 @@ app.get('/lastblockheight', function (req, res) {
 	})
 });
 
+app.get('/lastvinheight', function (req, res) {
+	cors(req, res, () => {
+		let latest = latestVin();
+		latest.then(lastHeight => {
+			let latestBlockObj = {lastVin: lastHeight};
+			console.log(latestBlockObj);
+			res.send(latestBlockObj);
+		})
+	})
+});
+
 app.get('/lastblocks', function (req, res) {
 	cors(req, res, () => {
 		Blocks.lastBlocks(function (err, blocks) {
@@ -280,6 +291,10 @@ app.get('/getpeerlist', function (req, res) {
 					peersArr.push({
 						id: peer._id,
 						ip: peer.addr,
+						country_name: peer.country_name,
+						region_name: peer.region_name,
+						city: peer.city,
+						time_zone: peer.time_zone,
 						version: peer.subversion,
 						lastConn: peer.conntime
 					});
@@ -291,6 +306,7 @@ app.get('/getpeerlist', function (req, res) {
 
 app.get('/getrichlist', function (req, res) {
 	cors(req, res, () => {
+		console.log(`getrichlist`);
 		let addressObj = {};
 		let richList = [];
 		Addresses.richList((err, addresses) => {
@@ -335,6 +351,15 @@ function latestBlock() {
 		Blocks.latestBlock(function (err, block) {
 			console.log(block.height);
 			resolve(block.height);
+		})
+	})
+}
+
+function latestVin(){
+	return new Promise((resolve, reject) => {
+		Vins.latestBlock(function (err, vin) {
+			console.log(vin.blockheight);
+			resolve(vin.blockheight);
 		})
 	})
 }

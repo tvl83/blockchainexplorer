@@ -12,7 +12,7 @@ const vinsSchema = mongoose.Schema({
 		coinbase: String
 	},
 	vout: { type: mongoose.Schema.Types.ObjectId, ref: 'Vouts' },
-	blockheight: {type: Number},
+	blockheight: {type: Number, index: true},
 	voutIndex: {type: Number},
 	thisTxid: {type: String, index: true},
 	prevTxid: {type: String, index: true},

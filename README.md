@@ -48,6 +48,30 @@ After everything is set up be sure to change all the information in `config.json
 
  What I am finding out is that if I have 500 blocks/txs and then do pavv `--end=100` then `--start=2 --end=200` it is doubling the data on the first 100 transactions instead of skipping them for some reason.
 
+### Oct 1, 2017 Notes
+
+Successfully sync'd 2000 blocks. It took a while but it is done and extremely accurate.
+
+Working on a script to go through little by little and sync all the blocks. I am also going to backup the db at regular intervals as well.
+
+The file `ToBlock2000full.archive` is a mongodump archive of the current database up to block 2000. More will be provided at a regular interval.
+
+created crontab entries:
+
+```
+*/5 * * * * /home/ionnode/.nvm/versions/node/v7.10.1/bin/node /home/ionnode/explorer/import.js --cmd=getpeerinfo >> /home/ionnode/import-peerinfo.log 2>&1
+*/9 * * * * /home/ionnode/.nvm/versions/node/v7.10.1/bin/node /home/ionnode/explorer/import.js --cmd=saveblocksonly --count=200 >> /home/ionnode/import-saveblocksonly.log 2>&1
+*/10 * * * * /home/ionnode/.nvm/versions/node/v7.10.1/bin/node /home/ionnode/explorer/import.js --cmd=pavv --start=2 --end=25 >> /home/ionnode/import-pavv.log 2>&1
+0 0 * * * /home/ionnode/.nvm/versions/node/v7.10.1/bin/node /home/ionnode/explorer/import.js --cmd=calculateaddressbalances >> /home/ionnode/import-updateaddressbalances.log 2>&1
+```
+
+- Running `getpeerinfo` every 5 minutes to update nodes. It automatically drops nodes that haven't been connected to within 24 hours.
+- `saveblocksonly` is run every 9 minutes to give time for it timing out and such. I bumped it down from 250 to 200 because it was timing out at 250. Might need to go lower per run.
+- `pavv` is the command, set at every 10 minutes but this needs to be adjusted or commented out  until the saveblocksonly is up to date.
+- `calculateaddressbalances` is to be run every night at midnight (maybe this can be more frequent throughout the day). It currently does not auto quit the process so this needs to be fixed.
+
+Added more archive files with more blocks to repo as a backup.
+
 ### Other Notes
 
 With the API server running (`nodemon apiserver.js`) and `npm start` also running you need to run `http://<your IP here>:3001/ionmarketinfo?force=true` to gather the market info for the first time. It'll run again for every page request if the data is more than 5 minutes old.
@@ -60,6 +84,9 @@ With the API server running (`nodemon apiserver.js`) and `npm start` also runnin
 - Daily block count is another part I still have to build and is pretty straight forward.
 - Inflation information. I am not entirely sure how to calculate this information. I am pretty sure it's the rate at which coins are created.
 - Address Tagging. This is already set up in the mongoose schema's and the functionality is built into the wallet. Creating the functions for this will be easy and quick. I cannot test it until the blockchain is up to date, though because I need to have an address that I own to be able to sign a message.
+
+10/2/2017
+- Use `node-ps` to detect if `iond` is running and if not, run it. This should be a cronjob running 1 minute before the import script
 
 ### Complete
 

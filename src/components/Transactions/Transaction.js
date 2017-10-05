@@ -1,7 +1,7 @@
 import React, {Component} from 'react';
 import {CHOSEN_NET, elipsisHash, numberWithCommas, ROOT_URL} from "../../utilities/utilities";
 import {Col, Grid, Panel, Row, Tab, Table, Tabs} from "react-bootstrap";
-// import SearchForm from "../SearchForm";
+import SearchForm from "../SearchForm";
 import Heading from "../Heading";
 import Moment from "react-moment";
 import AddressLink from "../Addresses/AddressLink";
@@ -79,7 +79,7 @@ export default class Transaction extends Component {
 		return (
 			<Grid>
 				<Heading/>
-				{/*<SearchForm redirect={false} path=""/>*/}
+				<SearchForm redirect={false} path=""/>
 				<Row>
 					<Col md={12}>
 						<h2>Details for Transaction</h2>

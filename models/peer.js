@@ -15,7 +15,18 @@ const peerSchema = mongoose.Schema({
 	inbound : Boolean,
 	startingheight : Number,
 	banscore : Number,
-	syncnode : Boolean
+	syncnode : Boolean,
+	country_code: String,
+	country_name: String,
+	region_code: String,
+	region_name: String,
+	city: String,
+	zip_code: String,
+	time_zone: String,
+	latitude: Number,
+	longitude: Number,
+	metro_code: Number
+
 });
 let Peers = mongoose.model('Peers', peerSchema);
 

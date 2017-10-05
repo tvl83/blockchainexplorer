@@ -67,8 +67,8 @@ const metaTxSchema = mongoose.Schema({
 });
 
 const blocksSchema = mongoose.Schema({
-	height: Number,
-	hash: String,
+	height: {type: Number, index: true},
+	hash: {type: String, index: true},
 	raw: rawBlockSchema,
 	meta: {
 		tx: [metaTxSchema]
@@ -83,7 +83,7 @@ blocksSchema.statics.latestBlock = function (cb) {
 };
 
 blocksSchema.statics.lastBlocks = function(cb){
-	this.find({}).sort({height:-1}).limit(100).exec(cb);
+	this.find({}).sort({height:-1}).limit(50).exec(cb);
 };
 
 let Blocks = mongoose.model('Blocks', blocksSchema);

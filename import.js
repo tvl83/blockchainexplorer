@@ -1,6 +1,7 @@
 let ioncoin = require('node-altcoin')();
 let fs = require('fs');
 let moment = require('moment');
+let fetch = require('node-fetch');
 // const util = require('util');
 // let readline = require('readline');
 // const ProgressBar = require('progress');
@@ -68,6 +69,9 @@ let cmd = argsArray.cmd;
 // });
 
 let block, start, end, count, address, toHeight, fromHeight;
+
+let txsFromFile = [];
+let blocksFromFile = [];
 
 // Tx
 let completeGetTxPercent = 0;
@@ -159,6 +163,9 @@ switch (cmd.toLowerCase()) {
 	case "saveblocksonly":
 		saveBlocksSetup(argsArray.count);
 		break;
+	case "savetxsonly":
+		saveTxsOnly(argsArray.start, argsArray.end);
+		break;
 	case "calculateaddressbalances":
 		calculateAddressBalances();
 		break;
@@ -183,9 +190,253 @@ switch (cmd.toLowerCase()) {
 	case "nextblocks":
 		saveBlocksSetup(argsArray.count, true);
 		break;
+	case "startblocks":
+		startblocks(argsArray.start);
+		break;
+	case "readfile":
+		readfile(argsArray.file, argsArray.start, argsArray.end);
+		break;
+	case 'findnextblock':
+		findNextBlock();
+		break;
+	case 'blocknotify':
+		blockNotify(argsArray.hash);
+		break;
 	default:
 		console.log("command not recognized");
 		process.exit();
+}
+
+function blockNotify(hash){
+	ioncoin.exec('getblock', hash, function (err, block) {
+		if(err)
+			console.log(err);
+		let tmpArray = [];
+		tmpArray.push(block);
+		saveNextBlock(tmpArray);
+	})
+}
+
+function findNextBlock(){
+	ioncoin.exec('getinfo', function (err, getinfo) {
+		let height = getinfo.blocks;
+
+		Blocks.latestBlock((err, latest) => {
+			console.log(`latest in db ${latest.height} and ${height} in the coin`);
+			if(latest.height < height) {
+				ioncoin.exec('getblockbynumber', latest.height + 1, function (err, block) {
+					if (err)
+						console.log(err);
+					let tmpArray = [];
+					tmpArray.push(block);
+
+					console.log(tmpArray);
+
+					saveNextBlock(tmpArray);
+				})
+			} else {
+				console.log("CAUGHT UP!!!!!!");
+			}
+		})
+	})
+}
+
+function readfile(file, start, end) {
+	let fs = require("fs");
+	console.log("\n *START* \n");
+	let blocksFile = fs.readFileSync(file);
+
+	blocksFile = JSON.parse(blocksFile);
+	console.log("Output Content : \n");
+
+	let txsRaw = []; // hold array of all tx's
+	let txIdList = []; // hold list of txid's
+
+	for (let i = start; i <= end; i++) {
+		txsRaw = blocksFile[`${i}`].tx; // take raw tx's from the block
+		// console.log(`txsRaw: txsRaw[${i}]`);
+		txsRaw.forEach(tx => {
+			txIdList.push(tx.txid);
+			tx.blockhash = blocksFile[`${i}`].hash;
+			tx.confirmations = blocksFile[`${i}`].confirmations;
+
+			txsFromFile.push(tx);
+		});
+
+		// console.log(`${txsRaw["blockhash"]}`);
+
+		blocksFile[`${i}`].tx = txIdList;
+
+		blocksFromFile.push(blocksFile[`${i}`]);
+		// txs.push(txsRaw);
+
+		// console.log(`block[${i}]: ${JSON.stringify(blocks[i], null, 2)}`);
+
+		// console.log(JSON.stringify(blocksFromFile, null, 2));
+
+		// clear arrays
+		txIdList = [];
+		// txsRaw = [];
+	}
+	saveBlockFromFile(blocksFromFile);
+	// console.log("txsFromFile");
+	// console.log(JSON.stringify(txsFromFile, null, 2));
+
+	console.log(`txs length: ${txsFromFile.length}`);
+	console.log(`blocks length: ${blocksFromFile.length}`);
+
+	// txs.forEach(tx => {
+	// 	console.log(JSON.stringify(tx, null,2));
+	// });
+
+	console.log("\n *EXIT* \n");
+	// process.exit();
+}
+
+function saveNextBlock(blocksArray) {
+	let createBlockArray = [];
+	let createTxArray = [];
+	let getTxArray = [];
+
+	console.log(blocksArray);
+	timeStarted = new Date();
+
+	blocksArray.forEach(block => {
+		// console.log("block", block);
+		let obj = {
+			hash: block.hash,
+			height: block.height,
+			raw: block
+		};
+		totalSaveBlocks++;
+		createBlockArray.push(createBlock(obj));
+	});
+
+	Promise.all(createBlockArray)
+		.then((blocks) => {
+			console.log("Resolving createBlockArray");
+			blocks.forEach(block => {
+				if (!block.err) {
+					// console.log("block: " + JSON.stringify(block.raw.tx, null, 2));
+					block.raw.tx.forEach(tx => {
+						totalGetTx++;
+						getTxArray.push(getTx(tx, block));
+					})
+				} else {
+					console.log(block.err)
+				}
+			});
+			Promise.all(getTxArray)
+				.then(txs => {
+					console.log("Resolving getTxArray");
+					txs.forEach(tx => {
+						totalSaveTx++;
+						createTxArray.push(createTx(tx.tx, tx.block));
+					});
+					Promise.all(createTxArray)
+						.then(() => {
+							console.log("resolving createTxArray");
+							if (start === 1) {
+								pavv(1, 25);
+							} else {
+								summary();
+							}
+						});
+				})
+		})
+}
+
+function saveBlockFromFile(blocksArray) {
+	let createBlockArray = [];
+	let createTxArray = [];
+	let getTxArray = [];
+
+	console.log(blocksArray);
+	timeStarted = new Date();
+
+	blocksArray.forEach(block => {
+		// console.log("block", block);
+		let obj = {
+			hash: block.hash,
+			height: block.height,
+			raw: block
+		};
+		totalSaveBlocks++;
+		createBlockArray.push(createBlock(obj));
+	});
+
+	Promise.all(createBlockArray)
+		.then((blocks) => {
+			console.log("Resolving createBlockArray");
+			blocks.forEach(block => {
+				if (!block.err) {
+					// console.log("block: " + JSON.stringify(block.raw.tx, null, 2));
+					block.raw.tx.forEach(tx => {
+						totalGetTx++;
+						getTxArray.push(getTxFromArray(tx, block));
+					})
+				} else {
+					console.log(block.err)
+				}
+			});
+			Promise.all(getTxArray)
+				.then(txs => {
+					console.log("Resolving getTxArray");
+					txs.forEach(tx => {
+						totalSaveTx++;
+						createTxArray.push(createTx(tx.tx, tx.block));
+					});
+					Promise.all(createTxArray)
+						.then(() => {
+							console.log("resolving createTxArray");
+							if (start === 1) {
+								pavv(1, 25);
+							} else {
+								summary();
+							}
+						});
+				})
+		})
+}
+
+function searchForTxidInArray(txid) {
+	let chosen = {};
+	txsFromFile.forEach(tx => {
+		if (tx.txid === txid)
+			chosen = tx;
+	});
+	return chosen;
+}
+
+function getTxFromArray(txid, block) {
+	return new Promise((resolve, reject) => {
+		let tx = searchForTxidInArray(txid);
+
+		completeGetTx++;
+		completeGetTxPercent = 100 * (completeGetTx / totalGetTx);
+		if (CLEAR_SCREEN)
+			console.log('\033c');
+		console.log(`Getting Txs: ${completeGetTx} / ${totalGetTx}  ${completeGetTxPercent.toFixed(2)}% complete`);
+		resolve({tx, block});
+	})
+}
+
+function startblocks(start, end) {
+	ioncoin.exec('getinfo', function (err, getinfo) {
+		if (err) {
+			throw err;
+		}
+		let blockheight = getinfo.blocks;
+
+		let timeout;
+		for (let i = 0; i < blockheight; i++) {
+			timeout = setTimeout(function () {
+				console.log(`1 second ${i} ... gotta wait til ${blockheight}`)
+			}, 1000);
+		}
+		clearTimeout(timeout);
+		process.exit();
+	})
 }
 
 function pavvSetup(startBlock, endBlock) {
@@ -212,7 +463,7 @@ function pavv(startBlock, endBlock) {
 	let voutsForAddress = [];
 	let newAddressesArray = [];
 
-	if(timeStarted === 0) {
+	if (timeStarted === 0) {
 		timeStarted = new Date();
 	}
 
@@ -220,14 +471,14 @@ function pavv(startBlock, endBlock) {
 
 	Transactions.find({$and: [{blockheight: {$gte: startBlock}}, {blockheight: {$lte: endBlock}}]})
 		.then(txs => {
-			// console.log("inside transactions.find()");
+			console.log("inside transactions.find()");
 			txs.forEach(tx => {
-				// console.log("inside txs.forEach");
+				console.log("inside txs.forEach");
 				tx.raw.vout.forEach(vout => {
-					// console.log("inside tx.raw.vout.forEach");
+					console.log("inside tx.raw.vout.forEach");
 					if (vout.scriptPubKey !== undefined && vout.scriptPubKey.addresses !== undefined) {
 						let address = vout.scriptPubKey.addresses[0];
-						// console.log(address);
+						console.log(address);
 						totalSaveAddresses++;
 						saveAddressArray.push(saveAddress(address));
 						newAddressesArray.push(address);
@@ -292,15 +543,16 @@ function pavv(startBlock, endBlock) {
 									newAddressesArray.forEach(address => {
 										// console.log(`voutsForAddress.push(linkVoutsToAddress(${address.address}))`);
 										// console.log(`address: ${address}`);
-										voutsForAddress.push(linkVoutsToAddress(address));
+										voutsForAddress.push(linkVoutsToAddress(address, startBlock));
 									});
 									console.log("finished pushing promises to array");
 									Promise.all(voutsForAddress)
 										.then(() => {
 											newAddressesArray.forEach(address => {
 												// console.log(`vinsForAddress.push(linkVinsToAddress(${address.address}))`);
-												vinsForAddress.push(linkVinsToAddress(address));
+												vinsForAddress.push(linkVinsToAddress(address, startBlock));
 											});
+											console.log("waiting for vinsForAddress promises to resolve");
 											Promise.all(vinsForAddress)
 												.then(() => {
 													cleanupTxAndAddresses()
@@ -317,17 +569,16 @@ function pavv(startBlock, endBlock) {
 }
 
 function cleanupTxAndAddresses() {
-
 	let updatedTxs = [];
 	let updatedAddresses = [];
-
 	return new Promise((resolve, reject) => {
 		Transactions.find({})
 			.then(transactions => {
-				// console.log("found transactions");
+				console.log("found transactions");
+				console.log(`transactions.count: ${transactions.length}`);
 				transactions.forEach(tx => {
 					if (tx.vouts.length > 1 || tx.vins.length > 1) {
-						// console.log(`each tx with vouts.length > 1 -- ${tx.txid} @ ${tx.vouts.length}`);
+						console.log(`each tx with vouts.length > 1 || vins.length > 1 -- ${tx.txid} @ ${tx.vouts.length}`);
 
 						tx.vouts.sort((a, b) => {
 							if (a.n < b.n)
@@ -347,49 +598,61 @@ function cleanupTxAndAddresses() {
 						let newTxVouts = removeDuplicates(tx.vouts, txVoutsEqual);
 						let newTxVins = removeDuplicates(tx.vins, txVinsEqual);
 
+						if (newTxVins.length < tx.vins.length) {
+							console.log(`removed ${tx.vins.length - newTxVins.length} duplicates`)
+						} else if (newTxVouts.length < tx.vouts.length) {
+							console.log(`removed ${tx.vouts.length - newTxVouts.length} duplicates`)
+						}
+
 						updatedTxs.push(cleanupTxVoutsVins(tx, newTxVouts, newTxVins));
 					}
 				});
-			});
 
-		Addresses.find({})
-			.then(addresses => {
-				addresses.forEach(addr => {
-					if (addr.ledgerOut.length > 1 || addr.ledgerIn.length > 1) {
-						// console.log(`each addr with ledgerIn.length or ledgerOut > 1 -- ${addr.address} @ ledgerIn: ${addr.ledgerIn.length} ledgerOut: ${addr.ledgerOut.length}`);
+				Addresses.find({})
+					.then(addresses => {
+						addresses.forEach(addr => {
+							if (addr.ledgerOut.length > 1 || addr.ledgerIn.length > 1) {
+								// console.log(`each addr with ledgerIn.length or ledgerOut > 1 -- ${addr.address} @ ledgerIn: ${addr.ledgerIn.length} ledgerOut: ${addr.ledgerOut.length}`);
 
-						addr.ledgerOut.sort((a, b) => {
-							if (a.n < b.n)
-								return -1;
-							if (a.n > b.n)
-								return 1;
-							return 0;
+								addr.ledgerOut.sort((a, b) => {
+									if (a.n < b.n)
+										return -1;
+									if (a.n > b.n)
+										return 1;
+									return 0;
+								});
+								addr.ledgerIn.sort((a, b) => {
+									if (a.n < b.n)
+										return -1;
+									if (a.n > b.n)
+										return 1;
+									return 0;
+								});
+
+								let newAddrLedgerOut = removeDuplicates(addr.ledgerOut, addressesLedgerOutEqual);
+								let newAddrLedgerIn = removeDuplicates(addr.ledgerIn, addressesLedgerInEqual);
+
+								if (newAddrLedgerIn.length < addr.ledgerIn.length) {
+									console.log(`removed ${addr.ledgerIn.length - newAddrLedgerIn.length} duplicates`)
+								} else if (newAddrLedgerOut.length < addr.ledgerOut.length) {
+									console.log(`removed ${addr.ledgerOut.length - newAddrLedgerOut.length} duplicates`)
+								}
+
+								updatedAddresses.push(cleanupAddressLedgers(addr, newAddrLedgerIn, newAddrLedgerOut))
+							}
 						});
-						addr.ledgerIn.sort((a, b) => {
-							if (a.n < b.n)
-								return -1;
-							if (a.n > b.n)
-								return 1;
-							return 0;
-						});
 
-						let newAddrLedgerOut = removeDuplicates(addr.ledgerOut, addressesLedgerOutEqual);
-						let newAddrLedgerIn = removeDuplicates(addr.ledgerIn, addressesLedgerInEqual);
+						console.log(`all txs added. ${updatedTxs.length} promises in array`);
+						console.log(`all addresses added. ${updatedAddresses.length} promises in array`);
 
-						updatedAddresses.push(cleanupAddressLedgers(addr, newAddrLedgerIn, newAddrLedgerOut))
-					}
-				});
-
-				console.log(`all txs added. ${updatedTxs.length} promises in array`);
-				console.log(`all addresses added. ${updatedAddresses.length} promises in array`);
-
-				Promise.all(updatedTxs)
-					.then(() => {
-						Promise.all(updatedAddresses)
+						Promise.all(updatedTxs)
 							.then(() => {
-								console.log("finished");
-								resolve();
-							})
+								Promise.all(updatedAddresses)
+									.then(() => {
+										console.log("finished");
+										resolve();
+									})
+							});
 					});
 			});
 	})
@@ -488,7 +751,7 @@ function catchUpTxs(startBlock, endBlock) {
 	let getTxArray = [];
 	let createTxArray = [];
 	timeStarted = new Date();
-	Blocks.find({$and: [{height: {$gt: startBlock}}, {height: {$lt: endBlock}}]})
+	Blocks.find({$and: [{height: {$gte: startBlock}}, {height: {$lte: endBlock}}]})
 		.then(blocks => {
 			blocks.forEach(block => {
 				if (!block.err) {
@@ -647,30 +910,60 @@ function getpeerinfo() {
 
 function createPeer(peer) {
 	return new Promise((resolve, reject) => {
-		Peers.create(peer, function (err, peerinfo) {
-			if (err && err.code === 11000) {
-				console.log("updating information");
-				Peers.findOneAndUpdate({addr: peer.addr},
-					{
-						$set: {
-							lastsend: peer.lastsend,
-							lastrecv: peer.lastrecv,
-							bytessent: peer.bytessent,
-							bytesrecv: peer.bytesrecv,
-							pingtime: peer.pingtime
-						}
-					}, {},
-					function (err, newDoc) {
-						if (err)
-							throw err;
-						resolve(newDoc);
+		fetchGeoIPInfo(peer.addr.split(":")[0])
+			.then(geodata => {
+
+				peer["country_code"] = geodata.country_code;
+				peer["country_name"] = geodata.country_name;
+				peer["region_code"] = geodata.region_code;
+				peer["region_name"] = geodata.region_name;
+				peer["city"] = geodata.city;
+				peer["zip_code"] = geodata.zip_code;
+				peer["time_zone"] = geodata.time_zone;
+				peer["latitude"] = geodata.latitude;
+				peer["longitude"] = geodata.longitude;
+				peer["metro_code"] = geodata.metro_code;
+
+				Peers.create(peer, function (err, peerinfo) {
+					if (err && err.code === 11000) {
+						console.log("updating information");
+						Peers.findOneAndUpdate({addr: peer.addr},
+							{
+								$set: {
+									lastsend: peer.lastsend,
+									lastrecv: peer.lastrecv,
+									bytessent: peer.bytessent,
+									bytesrecv: peer.bytesrecv,
+									pingtime: peer.pingtime
+								}
+							}, {},
+							function (err, newDoc) {
+								if (err)
+									throw err;
+								resolve(newDoc);
+							}
+						);
+
+					} else if (err) {
+						console.log(err);
+					} else {
+						console.log(`saved a peer ${peerinfo.addr}`);
+						resolve(peerinfo);
 					}
-				);
-			} else {
-				console.log(`saved a peer ${peerinfo.addr}`);
-				resolve(peerinfo);
-			}
-		});
+
+				})
+			});
+	})
+}
+
+function fetchGeoIPInfo(ipaddr) {
+	return new Promise((resolve, reject) => {
+		fetch(`http://freegeoip.net/json/${ipaddr}`)
+			.then((data) => {
+				data.json().then((data) => {
+					resolve(data);
+				});
+			});
 	})
 }
 
@@ -683,7 +976,7 @@ function saveBlocksSetup(end, inLoop) {
 				start = block.height;
 				console.log(`starting at ${block.height}`);
 			}
-			if(inLoop)
+			if (inLoop)
 				saveBlocks(start + 1, end, true);
 			else
 				saveBlocks(start + 1, end, false);
@@ -746,7 +1039,7 @@ function saveBlocks(start, end, inLoop) {
 								.then(txs => {
 									console.log("resolving createTxArray");
 									if (inLoop) {
-										pavv(2,end);
+										pavv(2, end);
 									} else {
 										if (start === 1) {
 											pavv(1, 25);
@@ -870,10 +1163,41 @@ function calculateAddressBalances() {
 				console.log("after sort");
 				calculateBalances(address, ledger)
 					.then(() => {
-						console.log("done");
+						recountRichlist()
+							.then(() => {
+								console.log("done");
+								process.exit();
+							});
 					})
 			})
-		})
+		});
+}
+
+function updateRichlist() {
+	let addressObj = {};
+	let richList = [];
+	Addresses.richList((err, addresses) => {
+		addresses.forEach((address, i) => {
+			addressObj = {
+				id: address._id,
+				rank: i + 1,
+				address: address.address,
+				amount: address.balance
+			};
+			richList.push(addressObj);
+
+			Addresses.findOneAndUpdate({address: address.address},
+				{
+					$set: {
+						rank: i + 1
+					}
+				}, {},
+				function (err, newDoc) {
+					if (err)
+						throw err;
+				})
+		});
+	})
 }
 
 /* This will calculate the totalSent, totalReceived, runningBalance and total balance
@@ -883,7 +1207,7 @@ function calculateAddressBalances() {
 function calculateBalances(address, ledger) {
 	return new Promise((resolve) => {
 		console.log("in calcbalance promise");
-		console.log(JSON.stringify(ledger, null, 2));
+		// console.log(JSON.stringify(ledger, null, 2));
 		let runningBalance = 0;
 		let totalSent = 0;
 		let totalReceived = 0;
@@ -930,6 +1254,27 @@ function calculateBalances(address, ledger) {
 		console.log(`totalSent: ${address.totalSent}`);
 		console.log(`totalReceived: ${address.totalReceived}`);
 		resolve(address);
+	})
+}
+
+function recountRichlist() {
+	return new Promise((resolve, reject) => {
+		Addresses.wholeRichList((err, addresses) => {
+			addresses.forEach((address, i) => {
+				Addresses.findOneAndUpdate({address: address.address},
+					{
+						$set: {
+							rank: i + 1
+						}
+					}, {new: true},
+					function (err, newDoc) {
+						if (err)
+							throw err;
+						console.log(newDoc.address);
+					})
+			});
+			resolve();
+		})
 	})
 }
 
@@ -1071,82 +1416,81 @@ function processBlocks(start, count) {
 		})
 }
 
-
-function linkVinsToAddress(address) {
+function linkVinsToAddress(address, aboveHeight = 1) {
 	return new Promise((resolve, reject) => {
 		// console.log(`linkVinsToAddress(${address})`);
-		Vins.find({address: address})
+		Vins.find({$and: [{address: address}, {blockheight: {$gte: aboveHeight}}]})
 			.then(vins => {
 				if (vins.length > 0) {
 					vins.forEach(vin => {
-						// console.log(`finding ${vin._id}`);
-						let newBalance = 0;
-						Addresses.findOne({address: vin.address})
-							.then(address => {
-								// console.log(`finding address ${vin.address}`);
-								newBalance = address.balance;
+						// if (vin.blockheight >= aboveHeight) {
+							// console.log(`finding ${vin._id}`);
+							let newBalance = 0;
+							Addresses.findOne({address: vin.address})
+								.then(address => {
+									// console.log(`finding address ${vin.address}`);
+									newBalance = address.balance;
 
-								let vinObj = {
-									txid: vin.raw.txid,
-									voutIndex: vin.voutIndex,
-									value: vin.value,
-								};
+									let vinObj = {
+										txid: vin.raw.txid,
+										voutIndex: vin.voutIndex,
+										value: vin.value,
+									};
 
-								debugLogger.debug(`balance before ${newBalance} for ${vin.address}`);
-								console.log(`balance before ${newBalance} for ${vin.address}`);
-								newBalance -= vin.value;
-								debugLogger.debug(`subtracting ${vin.value} from balance = ${newBalance} for ${vin.address}`);
-								console.log(`subtracting ${vin.value} from balance = ${newBalance} for ${vin.address}`);
+									console.log(`balance before ${newBalance} for ${vin.address}`);
+									newBalance -= vin.value;
+									console.log(`subtracting ${vin.value} from balance = ${newBalance} for ${vin.address}`);
 
-								Addresses.findOneAndUpdate({address: vin.address},
-									{
-										$push: {
-											ledgerOut: {
-												runningBalance: newBalance,
-												txid: vin.thisTxid,
-												voutIndex: vin.voutIndex,
-												value: vin.value,
-												time: vin.time,
-												blockheight: vin.blockheight,
-												type: "-"
+									Addresses.findOneAndUpdate({address: vin.address},
+										{
+											$push: {
+												ledgerOut: {
+													runningBalance: newBalance,
+													txid: vin.thisTxid,
+													voutIndex: vin.voutIndex,
+													value: vin.value,
+													time: vin.time,
+													blockheight: vin.blockheight,
+													type: "-"
+												},
 											},
+											$set: {
+												balance: newBalance
+											}
 										},
-										$set: {
-											balance: newBalance
+										{new: true},
+										function (err, newDoc) {
+											if (err) {
+												console.log("rejecting with err: ", err);
+												// reject(err);
+											}
+											else {
+												console.log(`successfully updated Address ${newDoc.address} with vin`)
+											}
 										}
-									},
-									{new: true},
-									function (err) {
-										if (err) {
-											console.log("rejecting with err: ", err);
-											reject(err);
-										}
-										// else {
-										// 	console.log(`successfully updated Address ${vin.address} with vin`)
-										// }
-									}
-								);
+									);
 
-								let txVinObj = vinObj;
-								txVinObj['address'] = vin.address;
+									let txVinObj = vinObj;
+									txVinObj['address'] = vin.address;
 
-								Transactions.findOneAndUpdate({txid: vin.thisTxid},
-									{
-										$push: {
-											vins: txVinObj
-										}
-									}, {new: true},
-									function (err, newDoc) {
-										if (err) {
-											console.log("rejecting with err: ", err);
-											reject(err);
-										}
-										else {
-											// console.log(`resolving after transactions.findOneAndUpdate(txid: ${vin.raw.txid})`);
-											resolve(newDoc);
-										}
-									})
-							});
+									Transactions.findOneAndUpdate({txid: vin.thisTxid},
+										{
+											$push: {
+												vins: txVinObj
+											}
+										}, {new: true},
+										function (err, newDoc) {
+											if (err) {
+												console.log("rejecting with err: ", err);
+												// reject(err);
+											}
+											else {
+												console.log(`resolving after transactions.findOneAndUpdate(txid: ${newDoc.txid})`);
+												resolve(newDoc);
+											}
+										})
+								});
+						// }
 					})
 				} else {
 					resolve({address: null});
@@ -1155,17 +1499,16 @@ function linkVinsToAddress(address) {
 	})
 }
 
-function linkVoutsToAddress(address) {
+function linkVoutsToAddress(address, aboveHeight = 1) {
 	return new Promise((resolve, reject) => {
-		// console.log(`linkVoutstoAddress(${address})`);
-		Vouts.find({address: address})
+		console.log(`linkVoutstoAddress(${address})`);
+		//{ $and: [ { "address": "idUjqdpEqcS86UfrzGEzDXv4yGZChat5jV" }, { "blockheight": { $gte: NumberInt(2000) } } ] }
+		Vouts.find({$and: [{address: address}, {blockheight: {$gte: aboveHeight}}]})
 			.then(vouts => {
-				// console.log(`vouts for address ${address}`);
-				// console.log(JSON.stringify(vouts, null, 2));
+				console.log(`${vouts.length} vouts for address ${address}`);
 				if (vouts.length > 0) {
 					vouts.forEach(vout => {
-						// console.log(`vout for address ${address}`);
-						// console.log(JSON.stringify(vout, null, 2));
+						// if (vout.blockheight >= aboveHeight) {
 						let newBalance = 0;
 						Addresses.findOne({address: vout.address})
 							.then((address) => {
@@ -1178,11 +1521,7 @@ function linkVoutsToAddress(address) {
 									time: vout.time
 								};
 
-								// debugLogger.debug(`balance before ${newBalance} for ${vout.address}`);
-								//       console.log(`balance before ${newBalance} for ${vout.address}`);
 								newBalance += vout.value;
-								// debugLogger.debug(`adding ${vout.value} to ${newBalance} = ${newBalance} for ${vout.address}`);
-								//       console.log(`adding ${vout.value} to ${newBalance} = ${newBalance} for ${vout.address}`);
 								Addresses.findOneAndUpdate({address: vout.address},
 									{
 										$push: {
@@ -1206,7 +1545,6 @@ function linkVoutsToAddress(address) {
 											console.log(" ------------------------------------------------------- rejecting with err: ------------------------------------------------------- \n", err);
 											resolve(err);
 										}
-										// console.log(`finished addresses.findOneAndUpdate({address: ${vout.address}})`)
 									}
 								);
 
@@ -1214,32 +1552,6 @@ function linkVoutsToAddress(address) {
 								txVoutObj['address'] = vout.address;
 
 								console.log(`voutObj to be added to ${vout.txid}`);
-								// console.log(JSON.stringify(txVoutObj, null, 2));
-
-								// let UPDATE_TX = true;
-
-								// Transactions.findOne({txid: vout.txid})
-								// 	.then(transaction => {
-								// console.log(`transaction.vouts.forEach() ${vout.txid}`);
-								// transaction.vouts.forEach(txVout => {
-								// console.log(`${txVout.txid} @ ${txVout.n}`);
-
-								// for (let i = 0; i < transaction.vouts.length; i++) {
-								// 	let txVout = transaction.vouts[i];
-								// 	// console.log(`${txVout.n} === ${txVoutObj.n} && ${txVout.txid} === ${txVoutObj.txid} && ${txVout.address} === ${txVoutObj.address}`);
-								// 	if (txVout.n === txVoutObj.n && txVout.txid === txVoutObj.txid && txVout.address === txVoutObj.address) {
-								// 		console.log(`----------------- FOUND MATCH DON'T ADD VOUT TO TX -----------------`);
-								// 		console.log(`----------------- ${txVout.txid} ${txVout.n} @ ${Date.now()} -----------------`);
-								// 		UPDATE_TX = false;
-								// 		console.log(`stopping on transaction.vouts[${i}]`);
-								// 		i = transaction.vouts.length + 10;
-								// 		console.log(`set i to ${i}`);
-								// 		resolve({dupe: true});
-								// 	}
-								// }
-								// // });
-								// console.log(`update_tx: ${UPDATE_TX}. ${txVoutObj.n} ${txVoutObj.txid} @ ${Date.now()}`);
-								// if (UPDATE_TX) {
 								Transactions.findOneAndUpdate(
 									{txid: vout.txid},
 									{
@@ -1251,17 +1563,15 @@ function linkVoutsToAddress(address) {
 										if (err) {
 											console.log("----------------- rejecting with err: -----------------", err);
 											resolve(err);
-										}
-										else {
-											// console.log(`finished Transactions.findOneAndUpdate({txid: ${vout.txid} ${vout.n}) @ ${Date.now()}`);
+										} else {
+											console.log(`finished Transactions.findOneAndUpdate({txid: ${vout.txid} ${vout.n}) @ ${Date.now()}`);
 											// console.log(`newDoc: ${newDoc}}) `);
 											resolve(newDoc);
 										}
 									}
 								)
-								// }
-								// });
 							})
+						// }
 					})
 				} else {
 					console.log(`inside linkVoutsToAddress resolve null because vout==null ${address}`);
@@ -1271,46 +1581,48 @@ function linkVoutsToAddress(address) {
 	})
 }
 
-function linkVinsToVouts(vin) {
+function linkVinsToVouts(vin, aboveHeight = 1) {
 	return new Promise((resolve, reject) => {
 		// console.log(`finding {txid:${vin.raw.txid}, n:${vin.raw.vout}}`);
 		Vouts.findOne({txid: vin.raw.txid, n: vin.raw.vout})
 			.then(vout => {
 				if (vout !== null) {
-					let query = {
-						"raw.txid": vout.txid,
-						"raw.vout": vout.n
-					};
+					if (vout.blockheight >= aboveHeight) {
+						let query = {
+							"raw.txid": vout.txid,
+							"raw.vout": vout.n
+						};
 
-					Vins.findOneAndUpdate(
-						query,
-						{
-							$set: {
-								"vout": vout._id,
-								"txid": vout.txid,
-								"voutIndex": vout.n,
-								"value": vout.value,
-								"address": vout.address
+						Vins.findOneAndUpdate(
+							query,
+							{
+								$set: {
+									"vout": vout._id,
+									"txid": vout.txid,
+									"voutIndex": vout.n,
+									"value": vout.value,
+									"address": vout.address
+								}
+							},
+							{new: true},
+							(err, doc) => {
+								if (err) {
+									linkVinsToVoutsRejected++;
+									reject(err);
+								}
+								completeVoutsForVins++;
+								completeVoutsForVinsPercent = 100 * (completeVoutsForVins / totalVoutsForVins);
+								if (CLEAR_SCREEN)
+									console.log('\033c');
+								console.log(`Processing VoutsForVins: ${completeVoutsForVins} / ${totalVoutsForVins} ${completeVoutsForVinsPercent.toFixed(2)}% complete`);
+								linkVinsToVoutsResolved++;
+								resolve(doc);
 							}
-						},
-						{new: true},
-						(err, doc) => {
-							if (err) {
-								linkVinsToVoutsRejected++;
-								reject(err);
-							}
-							completeVoutsForVins++;
-							completeVoutsForVinsPercent = 100 * (completeVoutsForVins / totalVoutsForVins);
-							if (CLEAR_SCREEN)
-								console.log('\033c');
-							console.log(`Processing VoutsForVins: ${completeVoutsForVins} / ${totalVoutsForVins} ${completeVoutsForVinsPercent.toFixed(2)}% complete`);
-							linkVinsToVoutsResolved++;
-							resolve(doc);
-						}
-					)
-				} else {
-					// console.log('reject');
-					resolve("vout null");
+						)
+					} else {
+						// console.log('reject');
+						resolve("vout null");
+					}
 				}
 			})
 	})
@@ -1347,7 +1659,7 @@ function summary(data) {
 	console.log(`Summary:`);
 	console.log(`Took ${seconds} seconds`);
 
-	console.log(`Total Blocks ${totalSaveBlocks}`);
+	console.log(`Total Blocks ${totalSaveBlocks} Last block saved `);
 	console.log(`Total Transactions ${totalSaveTx}`);
 	console.log(`Total Addresses ${totalSaveAddresses}`);
 	console.log(`Total Vins ${totalSaveVins}`);
@@ -1358,7 +1670,6 @@ function summary(data) {
 	if (data)
 		console.log(data);
 
-	// console.log('ctrl+c to quit');
 	process.exit();
 }
 
@@ -1432,10 +1743,10 @@ function saveVout(vout, tx, blockheight, address) {
 
 function saveAddress(address) {
 	return new Promise((resolve, reject) => {
-		// console.log("saveADDRESS()");
+		console.log("saveADDRESS()");
 		Addresses.create({address}, function (err, address) {
 			if (err && err.code === 11000) {
-				// console.log("error 11000 ... dupe address... moving on...");
+				console.log("error 11000 ... dupe address... moving on...");
 				resolve({address: "dupe"});
 				// }
 				// else if (err) {
@@ -1468,7 +1779,6 @@ function createTx(tx, block) {
 			} else if (err) {
 				reject(err);
 			} else {
-				// console.log(JSON.stringify(tx, null, 4));
 				Blocks.findOneAndUpdate({hash: block.hash},
 					{
 						$push: {
@@ -1493,6 +1803,7 @@ function createTx(tx, block) {
 function getTx(txid, block) {
 	return new Promise((resolve, reject) => {
 		ioncoin.exec('gettransaction', txid, function (err, tx) {
+			console.log(tx);
 			if (err)
 				throw err;
 			completeGetTx++;
@@ -1521,8 +1832,8 @@ function createBlock(blockObj) {
 			resolve(block);
 		})
 			.catch(err => {
-
 				if (err.code === 11000) {
+					// console.log(err);
 					resolve({err: "duplicate"});
 				}
 				else {

@@ -7,7 +7,7 @@ import FaArrowRight from "react-icons/lib/fa/arrow-right"
 import Moment from 'react-moment';
 import TransactionRowSummary from "../Transactions/TransactionRowSummary";
 import Heading from "../Heading";
-// import SearchForm from "../SearchForm";
+import SearchForm from "../SearchForm";
 
 export default class Block extends Component {
 
@@ -75,7 +75,7 @@ export default class Block extends Component {
 			return (
 				<Grid>
 					<Heading/>
-					{/*<SearchForm redirect={false} path=""/>*/}
+					<SearchForm redirect={false} path=""/>
 					<Row>
 						<Col md={12}>
 							<h2>Details for Block #{blockInfo.height}</h2>

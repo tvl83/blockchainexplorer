@@ -78,7 +78,7 @@ const addressesSchema = mongoose.Schema({
 	// vins: [vinsSchema],
 	// vouts: [voutsSchema],
 	balance: Number,
-	rank: Number,
+	rank: {type: Number, index: true},
 	tag: String,
 	tagVerified: Boolean,
 	totalSent: Number,
@@ -88,7 +88,10 @@ const addressesSchema = mongoose.Schema({
 addressesSchema.plugin(arrayUniquePlugin);
 
 addressesSchema.statics.richList = function(cb){
-	this.find({}).sort({balance:-1}).limit(3000).exec(cb);
+	this.find({}).sort({balance:-1}).limit(500).exec(cb);
+};
+addressesSchema.statics.wholeRichList = function(cb){
+	this.find({}).sort({balance:-1}).limit(20000).exec(cb);
 };
 
 let Address = mongoose.model('Address', addressesSchema);

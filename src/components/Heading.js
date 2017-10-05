@@ -8,12 +8,20 @@ export default class Heading extends Component {
 		super(props);
 
 		this.state = {
-			height: 0
+			height: 0,
+			lastVin:0
 		}
 	}
 
 	componentWillMount(){
 		fetch(`${ROOT_URL}/lastblockheight?net=${CHOSEN_NET}`)
+			.then((data) => {
+				data.json().then((data)=>{
+					this.setState(data);
+				});
+			});
+
+		fetch(`${ROOT_URL}/lastvinheight?net=${CHOSEN_NET}`)
 			.then((data) => {
 				data.json().then((data)=>{
 					this.setState(data);
@@ -27,6 +35,7 @@ export default class Heading extends Component {
 				<Col md={12}>
 					<h1>Ion Blockchain Explorer</h1>
 					<p>up to block <span id="up-to-block">{this.state.height}</span></p>
+					<p>All Data up to block <span id="up-to-block">{this.state.lastVin}</span></p>
 				</Col>
 			</Row>
 		)
