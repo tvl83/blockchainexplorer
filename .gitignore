@@ -2,6 +2,9 @@
 # WebStorm
 /.idea
 
+#adding to ignore list so that i don't publish my passwords
+config.json
+
 # dependencies
 /node_modules
 

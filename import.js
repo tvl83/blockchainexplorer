@@ -120,6 +120,9 @@ let startingat, endingat, qty;
 
 switch (cmd.toLowerCase()) {
 	case "savehashes":
+		/*
+		This is a basic command that will
+		 */
 		console.log(`command ${cmd.toLowerCase()}`);
 		start = argsArray.start;
 		count = argsArray.count || 1;
@@ -188,9 +191,9 @@ switch (cmd.toLowerCase()) {
 			address = argsArray.address;
 		cleanupAddress(address);
 		break;
-	// case 'cleanupaddresses':
-	// 	cleanupAddresses();
-	// 	break;
+	case 'cleanupaddresses':
+		cleanupAddresses();
+		break;
 	case 'pruneaddressvinsvouts':
 		address = argsArray.address;
 		let pruneHeight = argsArray.pruneheight;
@@ -206,9 +209,15 @@ switch (cmd.toLowerCase()) {
 		}
 		break;
 	case 'prunetransactions':
+		/*
+		This command will 'prune' transactions by emptying the vout and vin array within the given range
+		 */
 		pruneTransactions(argsArray.from, argsArray.to);
 		break;
 	case 'checkformissingblocks':
+		/*
+		this command will print out the missing blocks within a given range.
+		 */
 		if (argsArray.startingat !== undefined)
 			startingat = argsArray.startingat;
 		if (argsArray.qty !== undefined)
@@ -218,6 +227,10 @@ switch (cmd.toLowerCase()) {
 		checkForMissingBlocks(startingat, endingat, qty);
 		break;
 	case 'checkformissingtxs':
+		/*
+		this command will print out the missing txs (only if a given blockheight doesn't exist.
+		if a given blockheight has multiple txs it wont detect a missing one) within a given range.
+		 */
 		if (argsArray.startingat !== undefined)
 			startingat = argsArray.startingat;
 		if (argsArray.qty !== undefined)
@@ -227,6 +240,10 @@ switch (cmd.toLowerCase()) {
 		checkformissingtxs(startingat, endingat, qty);
 		break;
 	case 'checkformissingblockmetas':
+		/*
+		part of the process is adding meta information to the block document. this command will
+		print out a list of blocks missing that meta information
+		 */
 		checkformissingblockmetas();
 		break;
 	case 'getinfo':
@@ -527,7 +544,7 @@ function findNextBlock() {
 					saveNextBlock(tmpArray);
 				})
 			} else {
-				console.log("CAUGHT UP!!!!!!");
+				console.log("db is caught up! :D ");
 				process.exit();
 			}
 		})
@@ -2052,70 +2069,76 @@ function linkVoutsToAddress(address, aboveHeight = 1) {
 				console.log(`${vouts.length} vouts for address ${address}`);
 				if (vouts.length > 0) {
 					vouts.forEach(vout => {
-						let newBalance = 0;
-						Addresses.findOne({address: vout.address})
-							.then((address) => {
-								newBalance = address.balance || 0;
+						if(vout !== null) {
+							let newBalance = 0;
+							Addresses.findOne({address: vout.address})
+								.then((address) => {
+									newBalance = address.balance || 0;
 
-								let voutObj = {
-									txid: vout.txid,
-									n: vout.n,
-									value: vout.value,
-									time: vout.time
-								};
+									let voutObj = {
+										txid: vout.txid,
+										n: vout.n,
+										value: vout.value,
+										time: vout.time
+									};
 
-								newBalance += vout.value;
-								Addresses.findOneAndUpdate({address: vout.address},
-									{
-										$push: {
-											ledgerIn: {
-												runningBalance: newBalance,
-												txid: vout.txid,
-												n: vout.n,
-												value: vout.value,
-												time: vout.time,
-												blockheight: vout.blockheight,
-												type: "+"
+									newBalance += vout.value;
+									Addresses.findOneAndUpdate({address: vout.address},
+										{
+											$push: {
+												ledgerIn: {
+													runningBalance: newBalance,
+													txid: vout.txid,
+													n: vout.n,
+													value: vout.value,
+													time: vout.time,
+													blockheight: vout.blockheight,
+													type: "+"
+												}
+											},
+											$set: {
+												balance: newBalance
 											}
 										},
-										$set: {
-											balance: newBalance
+										{new: true},
+										function (err) {
+											if (err) {
+												console.log(" ------------------------------------------------------- rejecting with err: ------------------------------------------------------- \n", err);
+												resolve(err);
+											}
 										}
-									},
-									{new: true},
-									function (err) {
-										if (err) {
-											console.log(" ------------------------------------------------------- rejecting with err: ------------------------------------------------------- \n", err);
-											resolve(err);
-										}
-									}
-								);
+									);
 
-								let txVoutObj = voutObj;
-								txVoutObj['address'] = vout.address;
+									let txVoutObj = voutObj;
+									txVoutObj['address'] = vout.address;
 
-								console.log(`voutObj to be added to ${vout.txid} @ ${vout.n}`);
-								Transactions.findOneAndUpdate(
-									{txid: vout.txid},
-									{
-										$push: {
-											vouts: txVoutObj
+									console.log(`voutObj to be added to ${vout.txid} @ ${vout.n}`);
+									Transactions.findOneAndUpdate(
+										{txid: vout.txid},
+										{
+											$push: {
+												vouts: txVoutObj
+											}
+										}, {new: true},
+										function (err, newDoc) {
+											if (err && err.code === 11000) {
+												console.log("dupe vout");
+												resolve({dupe: true});
+											} else if (err) {
+												console.log("----------------- rejecting with err: -----------------", err);
+												resolve(err);
+											} else {
+												console.log(`finished Transactions.findOneAndUpdate({txid: ${vout.txid} ${vout.n}) @ ${Date.now()}`);
+												// console.log(`newDoc: ${newDoc}}) `);
+												resolve(newDoc);
+											}
 										}
-									}, {new: true},
-									function (err, newDoc) {
-										if (err && err.code === 11000) {
-											console.log("dupe vout")
-										} else if (err) {
-											console.log("----------------- rejecting with err: -----------------", err);
-											resolve(err);
-										} else {
-											console.log(`finished Transactions.findOneAndUpdate({txid: ${vout.txid} ${vout.n}) @ ${Date.now()}`);
-											// console.log(`newDoc: ${newDoc}}) `);
-											resolve(newDoc);
-										}
-									}
-								)
-							})
+									)
+								})
+						} else {
+							console.log(`inside linkVoutsToAddress resolve null because vout==null ${address}`);
+							resolve({address: null})
+						}
 					})
 				} else {
 					console.log(`inside linkVoutsToAddress resolve null because vout==null ${address}`);
@@ -2130,7 +2153,7 @@ function linkVinsToVouts(vin, aboveHeight = 1) {
 		console.log(`finding {txid:${vin.prevTxid}, n:${vin.raw.vout}}`);
 		Vouts.findOne({txid: vin.prevTxid, n: vin.raw.vout})
 			.then(vout => {
-				if (vout !== null) {
+				if (vout !== null && vout.txid !== undefined) {
 					// console.log(`vout ${vout}`);
 					let query = {
 						"prevTxid": vout.txid,
@@ -2307,7 +2330,7 @@ function saveAddress(address) {
 		console.log(`saveADDRESS(${address})`);
 		Addresses.create({address}, function (err, address) {
 			if (err && err.code === 11000) {
-				console.log("error 11000 ... dupe address... moving on...");
+				// console.log("error 11000 ... dupe address... moving on...");
 				resolve({address: "dupe"});
 				// }
 				// else if (err) {
@@ -2335,7 +2358,7 @@ function createTx(tx, block) {
 
 		Transactions.create(txObj, function (err, tx) {
 			if (err && err.code === 11000) {
-				console.log("Duplicate txid key... skipping");
+				// console.log("Duplicate txid key... skipping");
 				resolve({dupe: "dupe"})
 			} else if (err) {
 				reject(err);
