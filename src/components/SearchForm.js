@@ -24,30 +24,6 @@ export default class SearchForm extends Component {
 		this.searchAddress = this.searchAddress.bind(this);
 	}
 
-	// componentDidMount(){
-	// 	console.log("componentDidMount");
-	// }
-	//
-	// componentWillMount(){
-	// 	console.log("componentWillMount");
-	// 	this.setState({
-	// 		path: '',
-	// 		redirect: false
-	// 	});
-	// }
-
-	// componentDidUpdate(){
-	// 	console.log("componentDidUpdate");
-	// 	if(this.props.redirect) {
-	// 		// this.setState({
-	// 		// 	path: '',
-	// 		// 	redirect: false
-	// 		// });
-	// 		this.props.redirect = false;
-	// 		this.props.path = "";
-	// 	}
-	// }
-
 	processSearch(e) {
 		e.preventDefault();
 		let q = this.state.query.trim();

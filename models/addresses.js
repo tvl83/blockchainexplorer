@@ -88,10 +88,10 @@ const addressesSchema = mongoose.Schema({
 addressesSchema.plugin(arrayUniquePlugin);
 
 addressesSchema.statics.richList = function(cb){
-	this.find({}).sort({balance:-1}).limit(500).exec(cb);
+	this.find({balance: {$gt: 0.0}}).sort({balance:-1}).limit(500).exec(cb);
 };
 addressesSchema.statics.wholeRichList = function(cb){
-	this.find({}).sort({balance:-1}).limit(20000).exec(cb);
+	this.find({}).sort({balance:-1}).exec(cb);
 };
 
 let Address = mongoose.model('Address', addressesSchema);

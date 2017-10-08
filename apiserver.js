@@ -19,8 +19,8 @@ app.use(cookieParser());
 // APIs
 let mongoose = require('mongoose');
 
-let mongooseConnectString = `mongodb://${config.mongodbusername}:${config.mongodbpassword}@localhost:${config.mongodbport}/${config.mongodbnamemainnet}?authSource=admin`;
-// console.log(mongooseConnectString);
+let mongooseConnectString = `mongodb://${config.mongodbusername}:${config.mongodbpassword}@localhost:${config.mongodbport}/${config.mongodbname}?authSource=admin`;
+console.log(mongooseConnectString);
 
 mongoose.connect(mongooseConnectString, {useMongoClient: true});
 
@@ -35,6 +35,7 @@ let Vins = require('./models/vins');
 let Vouts = require('./models/vouts');
 let MarketData = require('./models/marketdata');
 let Peers = require('./models/peer');
+let GetInfo = require('./models/getinfo');
 
 app.get('/block', function (req, res) {
 	cors(req, res, () => {
@@ -118,6 +119,15 @@ app.get('/lastblockheight', function (req, res) {
 	})
 });
 
+app.get('/getinfo', function(req, res){
+	cors(req,res,() => {
+		GetInfo.findOne({})
+			.then(info => {
+				res.send(info);
+			})
+	})
+});
+
 app.get('/lastvinheight', function (req, res) {
 	cors(req, res, () => {
 		let latest = latestVin();
@@ -193,16 +203,16 @@ app.get('/ionmarketinfo', function (req, res) {
 				marketInfo = marketData;
 				let fiveMinutesMilliseconds = 5 * 60 * 1000;
 				let fiveMinutesFromNow = lastupdated + fiveMinutesMilliseconds;
-				console.log(`5fromNow: ${fiveMinutesFromNow}`);
-				console.log(`Date.now(): ${now}`);
-				console.log(`lastupdated: ${lastupdated}`);
-				console.log(`fiveMinutesMilliseconds: ${fiveMinutesMilliseconds}`);
-				console.log(`${lastupdated + fiveMinutesMilliseconds} > ${now}`);
+				// console.log(`5fromNow: ${fiveMinutesFromNow}`);
+				// console.log(`Date.now(): ${now}`);
+				// console.log(`lastupdated: ${lastupdated}`);
+				// console.log(`fiveMinutesMilliseconds: ${fiveMinutesMilliseconds}`);
+				// console.log(`${lastupdated + fiveMinutesMilliseconds} > ${now}`);
 				if ((lastupdated + fiveMinutesMilliseconds) > (now)) { // send data from db
-					console.log("dont need to update");
+					// console.log("dont need to update");
 					res.send(marketInfo);
 				} else { // data older than 5 minutes, update db and send data to client
-					console.log("data is more than 5 minutes old refreshing db");
+					// console.log("data is more than 5 minutes old refreshing db");
 					request({
 						uri: `https://api.coinmarketcap.com/v1/ticker/ion/`,
 						method: 'GET',
@@ -231,8 +241,8 @@ app.get('/ionmarketinfo', function (req, res) {
 						MarketData.findOneAndUpdate({}, {$set: marketdata}, {new: true, upsert: true}, function (err, doc) {
 							if (err)
 								res.send(err);
-							console.log("then");
-							console.log(doc);
+							// console.log("then");
+							// console.log(doc);
 							res.send(doc);
 						})
 					})
@@ -263,6 +273,8 @@ app.get('/address', function (req, res) {
 					return 0;
 				});
 				console.log("after sort");
+				console.log(address);
+
 				calculateBalances(address, ledger)
 					.then(address => {
 						res.json(address);
@@ -286,6 +298,7 @@ app.get('/getpeerlist', function (req, res) {
 	cors(req, res, () => {
 		let peersArr = [];
 		Peers.find({})
+			.sort({addr: 1})
 			.then(peers => {
 				peers.forEach(peer => {
 					peersArr.push({
@@ -299,6 +312,15 @@ app.get('/getpeerlist', function (req, res) {
 						lastConn: peer.conntime
 					});
 				});
+				peersArr.sort((a, b) => {
+					// swap signs of the return 1's to switch between ascending and descending
+					if (a.addr < b.addr)
+						return -1;
+					if (a.addr > b.addr)
+						return 1;
+					return 0;
+				});
+
 				res.send(peersArr);
 			});
 	});

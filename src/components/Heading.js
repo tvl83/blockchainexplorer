@@ -33,8 +33,8 @@ export default class Heading extends Component {
 		return (
 			<Row>
 				<Col md={12}>
-					<h1>Ion Blockchain Explorer</h1>
-					<p>up to block <span id="up-to-block">{this.state.height}</span></p>
+					<h1>Ion Blockchain Explorer ({CHOSEN_NET})</h1>
+					<p>latest block <span id="up-to-block">{this.state.height}</span></p>
 					<p>All Data up to block <span id="up-to-block">{this.state.lastVin}</span></p>
 				</Col>
 			</Row>

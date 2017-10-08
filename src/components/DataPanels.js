@@ -2,8 +2,8 @@ import React, {Component} from 'react';
 import { Row, Tabs, Tab} from 'react-bootstrap';
 import LatestBlocks from "./DataPanels/LatestBlocks";
 import RichList from "./DataPanels/RichList";
-import Overview from "./DataPanels/Overview";
-import Extraction from "./DataPanels/Extraction";
+// import Overview from "./DataPanels/Overview";
+// import Extraction from "./DataPanels/Extraction";
 import Network from "./DataPanels/Network";
 import AboutIon from "./DataPanels/AboutIon";
 

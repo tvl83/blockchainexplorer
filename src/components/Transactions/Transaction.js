@@ -1,7 +1,7 @@
 import React, {Component} from 'react';
 import {CHOSEN_NET, elipsisHash, numberWithCommas, ROOT_URL} from "../../utilities/utilities";
 import {Col, Grid, Panel, Row, Tab, Table, Tabs} from "react-bootstrap";
-import SearchForm from "../SearchForm";
+// import SearchForm from "../SearchForm";
 import Heading from "../Heading";
 import Moment from "react-moment";
 import AddressLink from "../Addresses/AddressLink";
@@ -58,7 +58,7 @@ export default class Transaction extends Component {
 
 					let totalValueOut = numberWithCommas(totalValue.toFixed(8));
 					let totalValueOutFormatted;
-					if(totalValue > 0)
+					if (totalValue > 0)
 						totalValueOutFormatted = numberWithCommas(totalValue.toFixed(8));
 					else
 						totalValueOutFormatted = totalValue.toFixed(8);
@@ -72,14 +72,23 @@ export default class Transaction extends Component {
 	}
 
 	render() {
-		console.log("this.state:", this.state);
+		// console.log("this.state:", this.state);
 		let txblock = this.state.tx;
-		console.log("txblock:", txblock);
+		// console.log("txblock:", txblock);
+		txblock.rawVouts.sort((a, b) => {
+			// swap signs of the return 1's to switch between ascending and descending
+			if (a.n < b.n)
+				return -1;
+			if (a.n > b.n)
+				return 1;
+			return 0;
+		});
+
 		let inputCount = -1;
 		return (
 			<Grid>
 				<Heading/>
-				<SearchForm redirect={false} path=""/>
+				{/*<SearchForm redirect={false} path=""/>*/}
 				<Row>
 					<Col md={12}>
 						<h2>Details for Transaction</h2>
@@ -104,7 +113,9 @@ export default class Transaction extends Component {
 								</tr>
 								<tr>
 									<td>Total Output</td>
-									<td>{this.state.totalValueOutFormatted} ION <small>({this.state.totalValueOut})</small></td>
+									<td>{this.state.totalValueOutFormatted} ION
+										<small>({this.state.totalValueOut})</small>
+									</td>
 								</tr>
 								<tr>
 									<td>Fees</td>
@@ -181,7 +192,9 @@ export default class Transaction extends Component {
 															<a href={`/tx/${vout.spentTxid}`}>{elipsisHash(vout.spentTxid)}</a>
 															:
 															'Not Yet Redeemed'}</td>
-														<td><a href={`/address/${vout.raw.scriptPubKey.addresses[0]}`}>{vout.raw.scriptPubKey.addresses[0]}</a></td>
+														<td><a
+															href={`/address/${vout.raw.scriptPubKey.addresses[0]}`}>{vout.raw.scriptPubKey.addresses[0]}</a>
+														</td>
 														<td>{numberWithCommas(vout.raw.value)} ION</td>
 													</tr>
 												)

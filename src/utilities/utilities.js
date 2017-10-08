@@ -27,11 +27,12 @@ export function formatBytes(bytes,decimals) {
 export function numberWithCommas(x) {
 	let parts = x.toString().split(".");
 	parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
 	return parts.join(".");
 }
 
 export const ROOT_URL = 'http://45.76.235.241:3001';
-export const CHOSEN_NET = 'mainnet';
+export const CHOSEN_NET = 'MAINNET';
 
 export function elipsisHash(hash){
 	return `${hash.substring(0,15)}...`

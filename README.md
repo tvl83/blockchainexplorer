@@ -72,6 +72,12 @@ created crontab entries:
 
 Added more archive files with more blocks to repo as a backup.
 
+### Oct 7, 2017
+
+Both testnet and mainnet have all of their blocks sync'd to the db with new blocks added automatically with a cronjob and blocknotify. Parsing the data and to extract out the vouts, vins, and address data is a much slower process because it requires a lot of, well parsing the data. I am able to run a cronjob to get the next 250 blocks at a time, it will just take a while.
+
+I have had to restart this process once on the testnet because of problems that arose. It looks like I might have to restart it on the mainnet as well because data was not parsed properly the first time around.
+
 ### Other Notes
 
 With the API server running (`nodemon apiserver.js`) and `npm start` also running you need to run `http://<your IP here>:3001/ionmarketinfo?force=true` to gather the market info for the first time. It'll run again for every page request if the data is more than 5 minutes old.
@@ -87,6 +93,11 @@ With the API server running (`nodemon apiserver.js`) and `npm start` also runnin
 
 10/2/2017
 - Use `node-ps` to detect if `iond` is running and if not, run it. This should be a cronjob running 1 minute before the import script
+
+10/7/2017
+- Filter out network nodes with different ports. They can be saved but don't have to be displayed on the network page
+- check to make sure nodes 24 hours old are being dropped
+- sort tx's by the order in the tx array on the raw block
 
 ### Complete
 

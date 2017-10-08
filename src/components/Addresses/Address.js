@@ -3,7 +3,7 @@ import {Col, Grid, Panel, Row, Tab, Table, Tabs} from "react-bootstrap";
 import {CHOSEN_NET, numberWithCommas, ROOT_URL} from "../../utilities/utilities";
 // import { Table as DataTable, Column, Cell } from "fixed-data-table";
 import Heading from "../Heading";
-import SearchForm from "../SearchForm";
+// import SearchForm from "../SearchForm";
 import AddressTxRowSummary from "./AddressTxRowSummary";
 
 export default class Address extends Component {
@@ -68,7 +68,7 @@ export default class Address extends Component {
 		return (
 			<Grid>
 				<Heading/>
-				<SearchForm redirect={false} path=""/>
+				{/*<SearchForm redirect={false} path=""/>*/}
 				<Row>
 					<Col md={12}>
 						<h2>Details for Address</h2>

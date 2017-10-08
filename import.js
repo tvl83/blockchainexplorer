@@ -246,7 +246,7 @@ function getinfo() {
 
 		GetInfo.findOne({})
 			.then(getInfoResponse => {
-				if(getInfoResponse === null){
+				if (getInfoResponse === null) {
 					GetInfo.create(getinfo,
 						function (err, newDoc) {
 							if (err)
@@ -321,8 +321,8 @@ function pruneTxs(tx) {
 				}
 			}, {new: true},
 			function (err, newDoc) {
-				console.log(`err: ${err}`);
-				// console.log(`newDoc: ${newDoc}`);
+				if (err)
+					console.log(`err: ${err}`);
 				console.log(`newDoc.vouts.length: ${newDoc.vouts.length}`);
 				console.log(`newDoc.vins.length: ${newDoc.vins.length}`);
 				console.log(`new document saved`);
@@ -1369,6 +1369,7 @@ function catchUpTxs(startBlock, endBlock) {
 
 function getpeerinfo() {
 	let peerPromises = [];
+	let peerRemovePromises = [];
 	ioncoin.exec('getpeerinfo', function (err, peers) {
 		if (err) {
 			throw err;
@@ -1387,19 +1388,30 @@ function getpeerinfo() {
 							let now = parseInt(Date.now());
 							// console.log(`peer.lastsend:                ${peer.lastsend * 1000}`);
 							// console.log(`oneDayMilliseconds:           ${oneDayMilliseconds}`);
-							console.log(`lastsend + oneDayMilliseconds:${(peer.lastsend * 1000) + oneDayMilliseconds}`);
-							console.log(`now:                          ${now}`);
+							// console.log(`lastsend + oneDayMilliseconds:${(peer.lastsend * 1000) + oneDayMilliseconds}`);
+							// console.log(`now:                          ${now}`);
 							// peers.forEach(peer => {
-								if ((peer.lastsend * 1000) + oneDayMilliseconds <= now ||
-									((peer.lastrecv * 1000) + oneDayMilliseconds <= now)) {
-									Peers.remove({addr: peer.addr}, (err, result) => {
-										console.log(`removed ${result}`);
-									});
-								}
+							if ((peer.lastsend * 1000) + oneDayMilliseconds <= now || ((peer.lastrecv * 1000) + oneDayMilliseconds <= now)) {
+								peerRemovePromises.push(removePeer(peer));
+							}
 							// })
 						});
+					});
+				Promise.all(peerRemovePromises)
+					.then(() => {
+						console.log("done");
+						process.exit();
 					})
 			});
+	})
+}
+
+function removePeer(peer) {
+	return new Promise((resolve, reject) => {
+		Peers.remove({addr: peer.addr}, (err, result) => {
+			resolve(result);
+			console.log(`removed ${result}`);
+		});
 	})
 }
 
@@ -2118,46 +2130,47 @@ function linkVinsToVouts(vin, aboveHeight = 1) {
 		console.log(`finding {txid:${vin.prevTxid}, n:${vin.raw.vout}}`);
 		Vouts.findOne({txid: vin.prevTxid, n: vin.raw.vout})
 			.then(vout => {
-				// console.log(`vout ${vout}`);
-				let query = {
-					"prevTxid": vout.txid,
-					"raw.vout": vout.n
-				};
+				if (vout !== null) {
+					// console.log(`vout ${vout}`);
+					let query = {
+						"prevTxid": vout.txid,
+						"raw.vout": vout.n
+					};
 
-				// console.log(`looking for ${JSON.stringify(query, null, 2)}`);
+					// console.log(`looking for ${JSON.stringify(query, null, 2)}`);
 
-				let updateObj = {
-					"vout": vout._id,
-					"txid": vout.txid,
-					"voutIndex": vout.n,
-					"value": vout.value,
-					"address": vout.address
-				};
+					let updateObj = {
+						"vout": vout._id,
+						"txid": vout.txid,
+						"voutIndex": vout.n,
+						"value": vout.value,
+						"address": vout.address
+					};
 
-				// console.log(`vins.findOneAndUpdate(${JSON.stringify(updateObj, null, 2)})`);
-				Vins.findOneAndUpdate(
-					query,
-					updateObj,
-					{new: true},
-					(err, doc) => {
-						if (err) {
-							linkVinsToVoutsRejected++;
-							reject(err);
+					// console.log(`vins.findOneAndUpdate(${JSON.stringify(updateObj, null, 2)})`);
+					Vins.findOneAndUpdate(
+						query,
+						updateObj,
+						{new: true},
+						(err, doc) => {
+							if (err) {
+								linkVinsToVoutsRejected++;
+								reject(err);
+							}
+							completeVoutsForVins++;
+							completeVoutsForVinsPercent = 100 * (completeVoutsForVins / totalVoutsForVins);
+							if (CLEAR_SCREEN)
+								console.log('\033c');
+							console.log(`Processing VoutsForVins: ${completeVoutsForVins} / ${totalVoutsForVins} ${completeVoutsForVinsPercent.toFixed(2)}% complete`);
+							linkVinsToVoutsResolved++;
+							// console.log(`doc: ${doc}`);
+							resolve(doc);
 						}
-						completeVoutsForVins++;
-						completeVoutsForVinsPercent = 100 * (completeVoutsForVins / totalVoutsForVins);
-						if (CLEAR_SCREEN)
-							console.log('\033c');
-						console.log(`Processing VoutsForVins: ${completeVoutsForVins} / ${totalVoutsForVins} ${completeVoutsForVinsPercent.toFixed(2)}% complete`);
-						linkVinsToVoutsResolved++;
-						// console.log(`doc: ${doc}`);
-						resolve(doc);
-					}
-				)
-				// } else {
-				// 	// console.log('reject');
-				// 	resolve("vout null");
-				// }
+					)
+				} else {
+					console.log('linkVinsToVouts ... reject');
+					resolve("vout null");
+				}
 			})
 	})
 }

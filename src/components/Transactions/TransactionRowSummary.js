@@ -36,7 +36,7 @@ export default class TransactionRowSummary extends Component {
 		this.props.tx.vouts.forEach(vout => {
 			total += vout.value;
 		});
-		return  numberWithCommas(total);
+		return  numberWithCommas(total.toFixed(8));
 	}
 
 	gatherAddresses() {
@@ -72,7 +72,7 @@ export default class TransactionRowSummary extends Component {
 							return (
 								<li key={address.address}>
 									<div className="addr"> <AddressLink address={address.address} /></div>
-									<div className="amount">{address.value} ION</div>
+									<div className="amount">{numberWithCommas(address.value.toFixed(8))} ION</div>
 								</li>
 							)
 						})

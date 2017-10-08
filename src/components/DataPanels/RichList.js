@@ -9,7 +9,13 @@ export default class RichList extends Component {
 		super(props);
 
 		this.state = {
-			richlist: []
+			richlist: [
+				{
+					rank: 0,
+					address: '',
+					amount: 10000.0
+				}
+			]
 		}
 	}
 
@@ -29,6 +35,7 @@ export default class RichList extends Component {
 		return (
 			<div>
 				<h4>Richest Addresses</h4>
+				Richlist is as of the latest block with all data processed. As the latest block processed goes up this list will change. This list also only shows addresses with greater than 0 ION in the address.
 				<Table striped condensed hover>
 					<thead>
 					<tr>
@@ -45,7 +52,7 @@ export default class RichList extends Component {
 									<tr key={ranking.rank}>
 										<td>{ranking.rank}</td>
 										<td><AddressLink address={ranking.address}/></td>
-										<td>{numberWithCommas(ranking.amount)} ION</td>
+										<td>{numberWithCommas(ranking.amount.toFixed(8))} ION</td>
 									</tr>
 								)
 							}
