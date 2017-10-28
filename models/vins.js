@@ -2,8 +2,8 @@ let mongoose = require('mongoose');
 
 const vinsSchema = mongoose.Schema({
 	raw: {
-		txid: String,
-		vout: Number,
+		txid: {type: String, index: true},
+		vout: {type: Number, index: true},
 		scriptSig: {
 			asm: String,
 			hex: String
@@ -13,7 +13,7 @@ const vinsSchema = mongoose.Schema({
 	},
 	vout: { type: mongoose.Schema.Types.ObjectId, ref: 'Vouts' },
 	blockheight: {type: Number, index: true},
-	voutIndex: {type: Number},
+	voutIndex: {type: Number, index: true},
 	thisTxid: {type: String, index: true},
 	prevTxid: {type: String, index: true},
 	value: Number,

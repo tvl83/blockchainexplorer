@@ -5,22 +5,22 @@ const arrayUniquePlugin = require('mongoose-unique-array');
 const ledgerInSchema = mongoose.Schema({
 	spent: Boolean,
 	txid: {type: String, index: true},
-	n: Number,
+	n: {type: Number, index: true},
 	blockheight: {type: Number, index: true},
-	value: Number,
-	time: Number,
-	type: String,
+	value: {type: Number, index: true},
+	time: {type: Number, index: true},
+	type: {type: String, index: true},
 	runningBalance: {type: Number, default: 0}
 });
 
 // VINS - spent
 const ledgerOutSchema = mongoose.Schema({
-	txid: String,
-	blockheight: {type: Number},
-	voutIndex: {type: Number},
-	value: Number,
-	time: Number,
-	type: String,
+	txid: {type: String, index: true},
+	blockheight: {type: Number, index: true},
+	voutIndex: {type: Number, index: true},
+	value: {type: Number, index: true},
+	time: {type: Number, index: true},
+	type: {type: String, index: true},
 	runningBalance: {type: Number, default: 0}
 });
 
@@ -75,11 +75,9 @@ const addressesSchema = mongoose.Schema({
 	address: {type: String, index: true, unique: true},
 	ledgerIn: [ledgerInSchema],
 	ledgerOut: [ledgerOutSchema],
-	// vins: [vinsSchema],
-	// vouts: [voutsSchema],
-	balance: Number,
+	balance: {type: Number, index: true},
 	rank: {type: Number, index: true},
-	tag: String,
+	tag: {type: String, index: true},
 	tagVerified: Boolean,
 	totalSent: Number,
 	totalReceived: Number

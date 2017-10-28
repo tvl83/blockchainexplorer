@@ -7,11 +7,11 @@ const rawBlockSchema = mongoose.Schema({
 	height: {type: Number, index: true},
 	version: Number,
 	merkleroot: String,
-	mint: Number,
-	time: Number,
+	mint: {type: Number, index: true},
+	time: {type: Number, index: true},
 	nonce: Number,
 	bits: String,
-	difficulty: Number,
+	difficulty: {type: Number, index: true},
 	blocktrust: String,
 	chaintrust: String,
 	previousblockhash: String,
@@ -68,7 +68,7 @@ const metaTxSchema = mongoose.Schema({
 
 const blocksSchema = mongoose.Schema({
 	height: {type: Number, index: true, unique: true},
-	hash: {type: String, index: true},
+	hash: {type: String, index: true, unique: true},
 	time: {type: Number, index: true},
 	mint: {type: Number, index: true},
 	raw: rawBlockSchema,

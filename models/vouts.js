@@ -5,7 +5,7 @@ const scriptPubKeySchema = mongoose.Schema({
 	hex: String,
 	reqSigs: Number,
 	type: String,
-	addresses: Array
+	addresses: {type: Array, index: true}
 });
 
 const voutRawSchema = mongoose.Schema({
@@ -16,12 +16,12 @@ const voutRawSchema = mongoose.Schema({
 
 const voutsSchema = mongoose.Schema({
 	raw: voutRawSchema,
-	spent: Boolean,
-	spentTxid: String,
+	spent: {type: Boolean, index: true},
+	spentTxid: {type: String, index: true},
 	txid: {type: String, index: true},
-	n: Number,
+	n: {type: Number, index: true},
 	blockheight: {type: Number, index: true},
-	value: Number,
+	value: {type: Number, index: true},
 	address: {type: String, index: true},
 	time: Number,
 	tx: {type: mongoose.Schema.Types.ObjectId, ref: 'Transactions'}

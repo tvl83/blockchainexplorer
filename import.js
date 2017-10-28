@@ -116,6 +116,14 @@ let linkVinsToVoutsResolved = 0;
 let lastBlockHeight = 0;
 let lastTxHeight = 0;
 
+let totalUpdateMint = 0,
+	completeUpdateMint = 0,
+	completeSaveUpdateMintPercent;
+
+let arrTotalUpdateMint = 0,
+	arrCompleteUpdateMint = 0,
+	arrCompleteSaveUpdateMintPercent;
+
 let startingat, endingat, qty;
 
 switch (cmd.toLowerCase()) {
@@ -249,9 +257,74 @@ switch (cmd.toLowerCase()) {
 	case 'getinfo':
 		getinfo();
 		break;
+	case 'updateblockminttime':
+		if(argsArray.start === undefined){
+			Blocks.findOne({ time: { $exists: false } })
+				.sort({height: 1})
+				.then(block => {
+					if(block.height <= 327479)
+						updateBlockMintTime(block.height, argsArray.count);
+					else {
+						console.log(`finished all the blocks`);
+						process.exit();
+					}
+				})
+		} else {
+			updateBlockMintTime(argsArray.start, argsArray.count);
+		}
+		break;
 	default:
 		console.log("command not recognized");
 		process.exit();
+}
+
+
+function updateBlockMintTime(start, count) {
+	console.log(`{height: {$gte: ${start}, $lte: ${start + count}}}`);
+	totalUpdateMint = count;
+	timeStarted = new Date();
+	let promises = [];
+	Blocks.find({height: {$gte: start, $lte: start + count}})
+		.then(blocks => {
+			// console.log(`found ${blocks.length} blocks`);
+			blocks.forEach(block => {
+				promises.push(updateTimeMint(block));
+				// arrCompleteUpdateMint++;
+				// arrCompleteSaveUpdateMintPercent = 100 * (arrCompleteUpdateMint / arrTotalUpdateMint);
+				// if (CLEAR_SCREEN)
+				// 	console.log('\033c');
+				// console.log(`Adding to array Update Mint/Time: ${arrCompleteUpdateMint} / ${arrTotalUpdateMint} ${arrCompleteSaveUpdateMintPercent.toFixed(2)}% complete`);
+			});
+
+			Promise.all(promises)
+				.then(() => {
+					summary();
+				})
+		})
+}
+
+function updateTimeMint(block){
+	return new Promise((resolve, reject) => {
+		Blocks.findOneAndUpdate(
+			{_id: block},
+			{
+				$set: {
+					mint: block.raw.mint,
+					time: block.raw.time
+				}
+			}, {new: true},
+			function (err) {
+				if (err)
+					throw err;
+
+				completeUpdateMint++;
+				completeSaveUpdateMintPercent = 100 * (completeUpdateMint / totalUpdateMint);
+				if (CLEAR_SCREEN)
+					console.log('\033c');
+				console.log(`Update Mint/Time: ${completeUpdateMint} / ${totalUpdateMint} ${completeSaveUpdateMintPercent.toFixed(2)}% complete`);
+				resolve(block.height);
+			})
+	});
 }
 
 function getinfo() {
@@ -614,6 +687,8 @@ function saveNextBlock(blocksArray) {
 		let obj = {
 			hash: block.hash,
 			height: block.height,
+			time: block.time,
+			mint: block.mint,
 			raw: block
 		};
 		totalSaveBlocks++;
@@ -664,6 +739,8 @@ function saveBlockFromFile(blocksArray) {
 	blocksArray.forEach(block => {
 		// console.log("block", block);
 		let obj = {
+			time: block.time,
+			mint: block.mint,
 			hash: block.hash,
 			height: block.height,
 			raw: block
@@ -2069,7 +2146,7 @@ function linkVoutsToAddress(address, aboveHeight = 1) {
 				console.log(`${vouts.length} vouts for address ${address}`);
 				if (vouts.length > 0) {
 					vouts.forEach(vout => {
-						if(vout !== null) {
+						if (vout !== null) {
 							let newBalance = 0;
 							Addresses.findOne({address: vout.address})
 								.then((address) => {
